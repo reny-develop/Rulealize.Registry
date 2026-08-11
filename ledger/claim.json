@@ -3,7 +3,7 @@
   "plugins": [
     {
       "id": "Rulealize.Plugin.Arithmetic",
-      "version": "1.0.0",
+      "admitted": "1.0.0",
       "namespace": "math",
       "prefix": null,
       "operations": {
@@ -23,7 +23,7 @@
     },
     {
       "id": "Rulealize.Plugin.Binding",
-      "version": "1.0.0",
+      "admitted": "1.0.0",
       "namespace": "bind",
       "prefix": "@",
       "operations": {
@@ -37,7 +37,7 @@
     },
     {
       "id": "Rulealize.Plugin.Branch",
-      "version": "1.0.0",
+      "admitted": "1.0.0",
       "namespace": "branch",
       "prefix": null,
       "operations": {
@@ -51,7 +51,7 @@
     },
     {
       "id": "Rulealize.Plugin.Comparison",
-      "version": "1.0.0",
+      "admitted": "1.0.0",
       "namespace": "cmp",
       "prefix": null,
       "operations": {
@@ -72,7 +72,7 @@
     },
     {
       "id": "Rulealize.Plugin.Definition",
-      "version": "1.0.0",
+      "admitted": "1.0.0",
       "namespace": "def",
       "prefix": "#",
       "operations": {
@@ -86,7 +86,7 @@
     },
     {
       "id": "Rulealize.Plugin.Grid",
-      "version": "1.1.0",
+      "admitted": "1.1.0",
       "namespace": "grid",
       "prefix": null,
       "operations": {
@@ -111,7 +111,7 @@
     },
     {
       "id": "Rulealize.Plugin.Logic",
-      "version": "1.0.0",
+      "admitted": "1.0.0",
       "namespace": "logic",
       "prefix": null,
       "operations": {
@@ -127,7 +127,7 @@
     },
     {
       "id": "Rulealize.Plugin.Record",
-      "version": "1.0.0",
+      "admitted": "1.0.0",
       "namespace": "rec",
       "prefix": null,
       "operations": {
@@ -149,7 +149,7 @@
     },
     {
       "id": "Rulealize.Plugin.Sequence",
-      "version": "1.2.0",
+      "admitted": "1.2.0",
       "namespace": "seq",
       "prefix": null,
       "operations": {
@@ -173,7 +173,7 @@
     },
     {
       "id": "Rulealize.Plugin.State",
-      "version": "1.0.0",
+      "admitted": "1.0.0",
       "namespace": "state",
       "prefix": "$",
       "operations": {
@@ -189,7 +189,7 @@
     },
     {
       "id": "Rulealize.Plugin.Tuple",
-      "version": "1.0.0",
+      "admitted": "1.0.0",
       "namespace": "tuple",
       "prefix": null,
       "operations": {
@@ -203,7 +203,7 @@
     },
     {
       "id": "Rulealize.Plugin.TypeSchema",
-      "version": "1.1.0",
+      "admitted": "1.1.0",
       "namespace": "type",
       "prefix": null,
       "operations": {

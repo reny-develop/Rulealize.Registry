@@ -31,6 +31,12 @@ using Rulealize.Abstraction.Plugin;
 // Operations are grouped by kind rather than listed as objects carrying one, which keeps a
 // new operation to a single line of diff. It also gives the one name registered as two kinds
 // somewhere to appear twice, which a map from name to kind could not.
+//
+// "admitted" is the version these claims were read from. This tool only ever reports which
+// version it found in the folder; the name is for the file it produces when that file is
+// committed, where the pinned version is the one the plugin was admitted at and every later
+// release is checked against it rather than re-reviewed. Catalogue runs this same tool once
+// per version, and there the field means nothing more than what was loaded.
 
 if (args.Length is 0 or > 2)
 {
@@ -89,7 +95,7 @@ static string Write(RuleRuntime runtime)
         {
             writer.WriteStartObject();
             writer.WriteString("id", plugin.Id);
-            writer.WriteString("version", Release(plugin.Version));
+            writer.WriteString("admitted", Release(plugin.Version));
             writer.WriteString("namespace", plugin.Namespace);
 
             if (plugin.ReservedPrefix is char prefix)

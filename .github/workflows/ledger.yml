@@ -6,10 +6,10 @@
 # is what decides whether that is true. Nothing here trusts the submitted file except for
 # the package identifiers and versions in it, which are what it goes and fetches.
 #
-# There is deliberately no schedule. The ledger pins a version per plugin, so a scheduled
-# re-derivation would reproduce the same file for ever and catch nothing; noticing that a
-# plugin has released a new version is a different job, and it belongs to the ingestion
-# phase (§9).
+# There is deliberately no schedule. The ledger pins the version each plugin was admitted at,
+# so a scheduled re-derivation would reproduce the same file for ever and catch nothing.
+# Noticing a release nobody submitted, and checking that its claims did not move, is
+# catalogue.yml — which is scheduled, for exactly that reason.
 
 name: ledger
 
@@ -49,7 +49,7 @@ jobs:
           set -euo pipefail
           mkdir -p work
           dotnet new classlib -o work/Fetch --framework net10.0 > /dev/null
-          jq -r '.plugins[] | "\(.id) \(.version)"' ledger/claim.json | while read -r id version; do
+          jq -r '.plugins[] | "\(.id) \(.admitted)"' ledger/claim.json | while read -r id version; do
             echo "::group::${id} ${version}"
             dotnet add work/Fetch package "${id}" --version "${version}"
             echo "::endgroup::"

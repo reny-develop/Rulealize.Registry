@@ -41,6 +41,36 @@ pull request touching the ledger: it fetches the packages the file names, re-der
 fails on any difference. A pull request may claim a namespace and an operation list; that job
 is what decides whether the claim is true.
 
+## The catalogue
+
+The ledger is what a person reviews. The catalogue is what the site and the resolver are
+generated from, and nobody reviews it — it is rebuilt from nuget.org on every run and is not
+in this repository.
+
+```sh
+dotnet publish tool/Ledger -c Release -o work/probe
+dotnet run --project tool/Catalogue -- ledger/claim.json work/probe/Rulealize.Registry.Ledger.dll site
+```
+
+| | |
+| --- | --- |
+| `site/index.json` | every plugin and operation in summary — 10 KB for the standard distribution, which is what makes search a client-side matter |
+| `site/plugin/<id>.json` | one plugin, every released version, every operation of each |
+
+The ledger holds one row per plugin because [a claim is permanent](doc/policy.md#a-claim-is-permanent);
+the catalogue holds one entry per version because a rule set's `requires` reads `^1.0` and
+operations may be added within a major. **So a new version of a plugin already admitted needs
+no pull request** — nothing committed changes, and the next scheduled run picks it up.
+
+What that would otherwise let through is a plugin changing its namespace quietly between
+releases. [`catalogue.yml`](.github/workflows/catalogue.yml) checks every version's claims
+against the ledger and writes nothing at all if one disagrees, so the rule is enforced daily
+while the file a person reads does not move.
+
+Nothing hand-written goes into a plugin entry. The description, repository, licence and
+abstraction version are in the `.nuspec`; the claims and operations are in the assembly. A
+submission is a package identifier.
+
 ## Why this is not just a page on nuget.org
 
 A package feed distributes plugins perfectly well, and this repository does not try to

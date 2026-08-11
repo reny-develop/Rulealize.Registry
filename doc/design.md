@@ -116,6 +116,43 @@ An operation has no independent existence and no submission of its own. It is a 
 of §3, which is what keeps the index from having a second, drifting account of what a plugin
 provides.
 
+### 4.1 Two documents, because only one of them is read by a person
+
+| | [`ledger/claim.json`](../ledger/claim.json) | the catalogue |
+| --- | --- | --- |
+| in git | **yes** — the diff *is* the review | no, generated on every run |
+| granularity | one row per plugin | one entry per **version** |
+| holds | the claims, and the version they were admitted at | descriptions, repositories, licences, every version's operations |
+| built by | [`tool/Ledger`](../tool/Ledger/) | [`tool/Catalogue`](../tool/Catalogue/) |
+
+The granularity is forced from opposite ends. A claim is
+[permanent](policy.md#a-claim-is-permanent), so a plugin has exactly one set of claims for
+its whole life and a second row could only ever contradict the first. But `requires` reads
+`^1.0`, and operations may be added within a major, so resolving a constraint needs the
+version list and the operations of each.
+
+**A plugin entry carries no hand-written prose at all.** The description, the repository, the
+licence and the abstraction it was built against are already in the `.nuspec`; the operations
+and the claims come from the assembly. A submission is a package identifier, which is what §2
+meant by carrying a pointer rather than a description — and it turned out to cost nothing,
+because a package feed already requires publishers to write all of it down.
+
+Rule sets are the exception, and the reason is that they have no `.nuspec`. A rule set
+document yields its `id`, `version`, `requires`, inputs and state fields, and nothing about
+who published it or what it is for. **They are the only place hand-written prose enters the
+registry**, which is one more reason they are worth doing after plugins rather than alongside.
+
+### 4.2 What a new version costs
+
+Nothing. Its claims are unchanged by definition, so no committed file moves and no pull
+request is opened; the next catalogue run finds it on nuget.org and it appears.
+
+What that would otherwise let through is a plugin changing its namespace quietly between
+versions, so **the catalogue checks every version's claims against the ledger** and refuses
+to write anything if one disagrees. The permanence rule is enforced mechanically, on a
+schedule, while the file a human reads does not move — which is the shape the whole split was
+for.
+
 ## 5. Rule sets are the second currency
 
 Almost every package ecosystem has one kind of thing in it. This one has two, and the reason
@@ -222,10 +259,22 @@ GitHub-shaped answer, which is why no server appears in any phase.
 | the site | Pages |
 | **the API** | **static JSON on that same Pages** |
 
-The last line is the one that decides the architecture. The index is published at stable
-URLs — `/index.json`, `/plugin/<id>.json`, `/op/<name>.json` — and that *is* the API. The
-Phase 3 resolver (§9) fetches static files. Search is client-side over a prebuilt index,
-which for a few hundred operations is not a compromise but the faster answer.
+The last line is the one that decides the architecture. The catalogue is published at stable
+URLs and that *is* the API:
+
+| | |
+| --- | --- |
+| `/index.json` | every plugin and every operation, in summary. What search reads |
+| `/plugin/<id>.json` | one plugin, all versions, all operations. What the resolver reads |
+
+The Phase 3 resolver (§9) needs one file per entry in a rule set's `requires`, and it is a
+static file. Search is client-side over the index, which at 10 KB for the standard
+distribution is not a compromise but the faster answer — the round trip that would fetch one
+operation is larger than the file holding all of them.
+
+There is no `/op/<name>.json`, though an earlier draft of this document said there would be.
+An operation's data is already in its plugin's file and duplicated in the index; a third copy
+would buy a request nobody makes. `/op/grid.ray` is a page, not a document.
 
 ### 8.1 The site is dark; the repository is not
 
@@ -269,10 +318,12 @@ diffs the claims against the ledger. Site generated, not published. The point of
 ledger first is §6: it is the only part that cannot be retrofitted, and at the end of this
 phase it is complete.
 
-**2 — ingestion.** A scheduled workflow queries nuget.org for packages depending on
-`Rulealize.Abstraction` and opens the pull request itself. The registry stops being a gate
-and becomes a view; curation degrades to the §7 badge. This is when a third-party plugin can
-appear without the author being told about it, and so it is gated on §6's deadline.
+**2 — ingestion.** Half of this turned out to be free: a *new version* of a plugin already
+admitted needs no pull request and no discovery, because §4.2 leaves nothing to commit and
+the scheduled catalogue run finds it. What is left is discovering a plugin nobody has
+submitted — querying nuget.org for packages depending on `Rulealize.Abstraction` and opening
+the pull request that would admit one. That is when the registry stops being a gate and
+becomes a view, and it is gated on §6's deadline.
 
 **3 — the resolver.** `rulealize restore ruleset/reversi.json` reads `requires`, resolves it
 against the index, and materialises a plugin folder.
@@ -319,6 +370,23 @@ that is one command.
 - **An absent claim is written, not omitted.** `"prefix": null`, and all three kinds present
   even when a plugin registers none of one. A ledger records claims, and "claimed no
   shorthand character" is a claim
+- **[`tool/Catalogue`](../tool/Catalogue/) is built**, and against the real feed it produces
+  12 plugin entries and a 10 KB index. Its check refuses to write anything at all when a
+  version's claims disagree with the ledger, which was worth having the negative case for:
+  a partial catalogue written beside a failure is a catalogue somebody will serve
+- **The catalogue loads no plugin, and cannot.** `PluginProbe` uses `Assembly.LoadFrom` into
+  the default context so that a plugin's `Rulealize.Abstraction` resolves to the one already
+  in memory — right for a host, and it means **one process cannot hold two versions of the
+  same plugin assembly**. So the catalogue runs `tool/Ledger` once per version in a process
+  of its own and reads its output. The tool that fetches touches no plugin; the tool that
+  loads touches no network
+- **`version` became `admitted`** in the ledger. The field had come to mean two things —
+  which version to fetch, and which version the claims were reviewed at — and only the second
+  survives now that the catalogue checks the rest
+- **Third-party prose is escaped as third-party prose.** A description is whatever a publisher
+  put in their `.nuspec` and a page will eventually put it on screen, so the catalogue keeps
+  `< > & ' "` escaped while letting other scripts through unescaped — a Japanese description
+  stays itself instead of becoming six times its length in `\uXXXX`
 - **A namespace cannot be reserved before its package exists**, which had been left open here
   and is settled in [the grant policy](policy.md#no-claim-before-a-package). It turned out not
   to be the judgement call it looked like: an entry is derived by loading an assembly, so a
@@ -356,9 +424,9 @@ Two consequences worth recording, because neither was obvious before doing it:
 
 ### Open
 
-- **The rest of the index format.** The ledger is settled; the plugin and rule set entries
-  the site is generated from are not, and they are not the same document — §6's ledger is
-  reviewed by a person, and a catalogue does not have to be
+- **The rule set entry.** The plugin half of the index is settled (§4.1); rule sets are not,
+  and they are where the hand-written half of a submission lives. Deliberately left until the
+  plugin half is running end to end
 - **When the site goes public.** The constraint is one-sided — before the first third-party
   plugin, not after (§6) — and the date is not chosen
 - **Whether a rule set may require a plugin that is not in the index at all**, which is the

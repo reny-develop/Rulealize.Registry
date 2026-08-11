@@ -1,0 +1,59 @@
+# Builds the catalogue, and checks every published version against the ledger.
+#
+# The ledger holds one row per plugin because a claim is permanent; the catalogue holds one
+# entry per version because `requires` reads ^1.0 and an operation may be added within a
+# major. So a new version of a plugin already admitted needs no pull request: nothing
+# committed changes and this run picks it up.
+#
+# Which is why this one IS scheduled, where the ledger's check is not. A release that nobody
+# submits is exactly what a schedule is for, and it is also the only way a plugin could
+# quietly change its namespace between versions — so the same run that finds the release
+# checks its claims against the ledger and fails if they moved.
+
+name: catalogue
+
+on:
+  pull_request:
+    paths:
+      - 'ledger/**'
+      - 'tool/**'
+      - '.github/workflows/catalogue.yml'
+  push:
+    branches: [ main ]
+  schedule:
+    - cron: '0 4 * * *'
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '10.0.x'
+
+      # NuGet.config adds a folder feed beside the repository, which exists on a workstation
+      # and not on a runner. An empty directory satisfies the source without offering
+      # anything, so every package resolves from nuget.org.
+      - name: Provide the local feed as an empty directory
+        run: mkdir -p "${GITHUB_WORKSPACE}/../LocalNuGet"
+
+      # The catalogue loads no plugin — one process cannot hold two versions of the same
+      # assembly — and runs this once per version instead.
+      - name: Build the probe
+        run: dotnet publish tool/Ledger -c Release -o work/probe
+
+      - name: Build the catalogue
+        run: >
+          dotnet run --project tool/Catalogue --
+          ledger/claim.json work/probe/Rulealize.Registry.Ledger.dll site
+
+      # Not committed: it is derived from nuget.org on every run, and a generated file in the
+      # history would be one more thing that can disagree with what the packages say.
+      - uses: actions/upload-artifact@v4
+        with:
+          name: catalogue
+          path: site
