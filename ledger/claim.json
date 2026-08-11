@@ -1,0 +1,222 @@
+{
+  "$schema": "rulealize/registry/ledger/v1",
+  "plugins": [
+    {
+      "id": "Rulealize.Plugin.Arithmetic",
+      "version": "1.0.0",
+      "namespace": "math",
+      "prefix": null,
+      "operations": {
+        "expression": [
+          "math.abs",
+          "math.add",
+          "math.div",
+          "math.max",
+          "math.min",
+          "math.mod",
+          "math.mul",
+          "math.sub"
+        ],
+        "effect": [],
+        "schema": []
+      }
+    },
+    {
+      "id": "Rulealize.Plugin.Binding",
+      "version": "1.0.0",
+      "namespace": "bind",
+      "prefix": "@",
+      "operations": {
+        "expression": [
+          "bind.let",
+          "bind.local"
+        ],
+        "effect": [],
+        "schema": []
+      }
+    },
+    {
+      "id": "Rulealize.Plugin.Branch",
+      "version": "1.0.0",
+      "namespace": "branch",
+      "prefix": null,
+      "operations": {
+        "expression": [
+          "branch.if",
+          "branch.match"
+        ],
+        "effect": [],
+        "schema": []
+      }
+    },
+    {
+      "id": "Rulealize.Plugin.Comparison",
+      "version": "1.0.0",
+      "namespace": "cmp",
+      "prefix": null,
+      "operations": {
+        "expression": [
+          "cmp.coalesce",
+          "cmp.compare",
+          "cmp.eq",
+          "cmp.gt",
+          "cmp.gte",
+          "cmp.isNull",
+          "cmp.lt",
+          "cmp.lte",
+          "cmp.ne"
+        ],
+        "effect": [],
+        "schema": []
+      }
+    },
+    {
+      "id": "Rulealize.Plugin.Definition",
+      "version": "1.0.0",
+      "namespace": "def",
+      "prefix": "#",
+      "operations": {
+        "expression": [
+          "def.call",
+          "def.ref"
+        ],
+        "effect": [],
+        "schema": []
+      }
+    },
+    {
+      "id": "Rulealize.Plugin.Grid",
+      "version": "1.1.0",
+      "namespace": "grid",
+      "prefix": null,
+      "operations": {
+        "expression": [
+          "grid.at",
+          "grid.cells",
+          "grid.coords",
+          "grid.directions",
+          "grid.ray",
+          "grid.with",
+          "grid.withMany"
+        ],
+        "effect": [
+          "grid.set",
+          "grid.setMany"
+        ],
+        "schema": [
+          "grid.board",
+          "grid.square"
+        ]
+      }
+    },
+    {
+      "id": "Rulealize.Plugin.Logic",
+      "version": "1.0.0",
+      "namespace": "logic",
+      "prefix": null,
+      "operations": {
+        "expression": [
+          "logic.and",
+          "logic.not",
+          "logic.or",
+          "logic.xor"
+        ],
+        "effect": [],
+        "schema": []
+      }
+    },
+    {
+      "id": "Rulealize.Plugin.Record",
+      "version": "1.0.0",
+      "namespace": "rec",
+      "prefix": null,
+      "operations": {
+        "expression": [
+          "rec.at",
+          "rec.has",
+          "rec.keys",
+          "rec.with"
+        ],
+        "effect": [
+          "rec.set",
+          "rec.update"
+        ],
+        "schema": [
+          "rec.map",
+          "rec.of"
+        ]
+      }
+    },
+    {
+      "id": "Rulealize.Plugin.Sequence",
+      "version": "1.2.0",
+      "namespace": "seq",
+      "prefix": null,
+      "operations": {
+        "expression": [
+          "seq.any",
+          "seq.concat",
+          "seq.count",
+          "seq.elementAt",
+          "seq.empty",
+          "seq.of",
+          "seq.select",
+          "seq.selectMany",
+          "seq.skip",
+          "seq.take",
+          "seq.takeWhile",
+          "seq.where"
+        ],
+        "effect": [],
+        "schema": []
+      }
+    },
+    {
+      "id": "Rulealize.Plugin.State",
+      "version": "1.0.0",
+      "namespace": "state",
+      "prefix": "$",
+      "operations": {
+        "expression": [
+          "state.get"
+        ],
+        "effect": [
+          "state.set",
+          "state.update"
+        ],
+        "schema": []
+      }
+    },
+    {
+      "id": "Rulealize.Plugin.Tuple",
+      "version": "1.0.0",
+      "namespace": "tuple",
+      "prefix": null,
+      "operations": {
+        "expression": [
+          "tuple.at",
+          "tuple.of"
+        ],
+        "effect": [],
+        "schema": []
+      }
+    },
+    {
+      "id": "Rulealize.Plugin.TypeSchema",
+      "version": "1.1.0",
+      "namespace": "type",
+      "prefix": null,
+      "operations": {
+        "expression": [],
+        "effect": [],
+        "schema": [
+          "type.bool",
+          "type.enum",
+          "type.int",
+          "type.list",
+          "type.string"
+        ]
+      }
+    }
+  ]
+}

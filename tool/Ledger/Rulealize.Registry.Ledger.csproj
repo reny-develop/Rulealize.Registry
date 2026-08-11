@@ -1,0 +1,24 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <TargetFramework>net10.0</TargetFramework>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+    <IsPackable>false</IsPackable>
+    <RootNamespace>Rulealize.Registry.Ledger</RootNamespace>
+  </PropertyGroup>
+
+  <!--
+    Rulealize arrives as a package rather than as a project reference to a sibling
+    repository. That is what lets this tool run somewhere that has cloned nothing but this
+    repository, which is the whole requirement CI places on it.
+
+    This tool is a host: it calls LoadPluginsFrom and reads what came back. It references no
+    plugin, by package or otherwise, and could not name a plugin type if it wanted to.
+  -->
+  <ItemGroup>
+    <PackageReference Include="Rulealize" Version="0.1.0" />
+  </ItemGroup>
+
+</Project>

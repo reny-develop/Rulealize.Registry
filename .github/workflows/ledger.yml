@@ -1,0 +1,69 @@
+# Re-derives the claim ledger from the packages it names and fails if the result differs
+# from what is committed.
+#
+# This is what doc/design.md §3 means by deriving the facts rather than accepting them: a
+# pull request may say a plugin claims a namespace and provides an operation, and this job
+# is what decides whether that is true. Nothing here trusts the submitted file except for
+# the package identifiers and versions in it, which are what it goes and fetches.
+#
+# There is deliberately no schedule. The ledger pins a version per plugin, so a scheduled
+# re-derivation would reproduce the same file for ever and catch nothing; noticing that a
+# plugin has released a new version is a different job, and it belongs to the ingestion
+# phase (§9).
+
+name: ledger
+
+on:
+  pull_request:
+    paths:
+      - 'ledger/**'
+      - 'tool/Ledger/**'
+      - '.github/workflows/ledger.yml'
+  push:
+    branches: [ main ]
+  workflow_dispatch:
+
+jobs:
+  rederive:
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '10.0.x'
+
+      # NuGet.config adds a folder feed beside the repository, which exists on a workstation
+      # with the other repositories cloned and not on a runner. An empty directory satisfies
+      # the source without offering anything, so every package resolves from nuget.org.
+      - name: Provide the local feed as an empty directory
+        run: mkdir -p "${GITHUB_WORKSPACE}/../LocalNuGet"
+
+      # One project referencing exactly the packages the ledger names, published so that the
+      # assemblies land in one folder. What else lands there does not matter: LoadPluginsFrom
+      # sweeps a folder and passes over assemblies with no plugin in them, which is why
+      # pointing it at an application's own output is a reasonable thing to do.
+      - name: Fetch the packages the ledger names
+        run: |
+          set -euo pipefail
+          mkdir -p work
+          dotnet new classlib -o work/Fetch --framework net10.0 > /dev/null
+          jq -r '.plugins[] | "\(.id) \(.version)"' ledger/claim.json | while read -r id version; do
+            echo "::group::${id} ${version}"
+            dotnet add work/Fetch package "${id}" --version "${version}"
+            echo "::endgroup::"
+          done
+          dotnet publish work/Fetch -c Release -o work/plugin
+
+      - name: Re-derive the ledger
+        run: dotnet run --project tool/Ledger -- work/plugin work/claim.json
+
+      # The tool sorts everything and writes no timestamp, so an unchanged set of packages
+      # produces a byte-identical file. Any difference here is a claim that was not true.
+      - name: Compare with what was committed
+        run: |
+          if ! diff -u ledger/claim.json work/claim.json; then
+            echo "::error file=ledger/claim.json::The ledger does not match what the packages claim. The lines marked + are what they actually claim."
+            exit 1
+          fi
