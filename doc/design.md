@@ -319,6 +319,12 @@ that is one command.
 - **An absent claim is written, not omitted.** `"prefix": null`, and all three kinds present
   even when a plugin registers none of one. A ledger records claims, and "claimed no
   shorthand character" is a claim
+- **A namespace cannot be reserved before its package exists**, which had been left open here
+  and is settled in [the grant policy](policy.md#no-claim-before-a-package). It turned out not
+  to be the judgement call it looked like: an entry is derived by loading an assembly, so a
+  reservation could only be a hand-written claim no artifact backs — §2's second declaration,
+  arriving by a different door. Refusing it costs a publisher the risk of being beaten to a
+  name, and the answer to that is to publish `0.1.0` on the day the name is chosen
 
 ### Blocked, and how it reordered the phases
 
@@ -353,9 +359,6 @@ Two consequences worth recording, because neither was obvious before doing it:
 - **The rest of the index format.** The ledger is settled; the plugin and rule set entries
   the site is generated from are not, and they are not the same document — §6's ledger is
   reviewed by a person, and a catalogue does not have to be
-- **Whether a claim can be reserved before a package exists.** Refusing it means a
-  publisher's namespace can be taken while they are still building; allowing it is how
-  squatting starts. No answer yet
 - **When the site goes public.** The constraint is one-sided — before the first third-party
   plugin, not after (§6) — and the date is not chosen
 - **Whether a rule set may require a plugin that is not in the index at all**, which is the
