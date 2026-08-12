@@ -27,6 +27,6 @@ does the catalogue built from it by [`tool/Catalogue`](../tool/Catalogue/), whic
 committed anywhere because it is derived from nuget.org on every run. Both formats are
 described in [the design record's §4.1](design.md#41-two-documents-because-only-one-of-them-is-read-by-a-person).
 
-What is left unwritten is the rule set entry. It is the half of a submission that cannot be
-derived from anything — a rule set has no `.nuspec` — and it waits until the plugin half is
-running end to end.
+Nothing is left unwritten. The rule set entry was going to be the third document here and is
+not: [§5](design.md) records the four findings that took the case for it apart, and the
+compatibility sweep that went with it for want of anything to sweep.

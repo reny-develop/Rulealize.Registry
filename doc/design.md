@@ -57,15 +57,12 @@ already is the identity system (§7).
 ## 3. Where the facts come from — the validator is an ordinary host
 
 ```
-submission:  a package id on nuget.org         (plugin)
-             a repository and a tag            (rule set)
+submission:  a package id on nuget.org
 ```
 
-CI fetches it and **loads it the way an application does**. For a plugin, that is
-`LoadPluginsFrom` over the extracted package — the same folder scan a deployed application
-runs, which is already the arrangement the Rulealize tests and samples use rather than a
-project reference. For a rule set, it is `CreateContext` against the plugins its `requires`
-resolves to.
+CI fetches it and **loads it the way an application does**: `LoadPluginsFrom` over the
+extracted package, the same folder scan a deployed application runs, which is already the
+arrangement the Rulealize tests and samples use rather than a project reference.
 
 Nothing in the registry knows more about a plugin than an application does, and there is no
 path by which the index can describe a plugin the runtime would not.
@@ -104,13 +101,14 @@ read-only view is what turns `'grid.rey' is not a known operation` into `did you
 demand this design makes on the runtime is one property**, and it is one nobody would regret
 having.
 
-## 4. Three kinds of entry
+## 4. Two kinds of entry
 
 | | Submitted | Keyed by | Valid when |
 | --- | --- | --- | --- |
 | **plugin** | yes | package identifier | it loads, and its claims are free |
 | **operation** | **no — derived** | `grid.ray` | its plugin is |
-| **rule set** | yes | `<publisher>/<id>` | it compiles |
+
+There was a third for most of the life of this document, and §5 is what became of it.
 
 An operation has no independent existence and no submission of its own. It is a projection
 of §3, which is what keeps the index from having a second, drifting account of what a plugin
@@ -137,10 +135,8 @@ and the claims come from the assembly. A submission is a package identifier, whi
 meant by carrying a pointer rather than a description — and it turned out to cost nothing,
 because a package feed already requires publishers to write all of it down.
 
-Rule sets are the exception, and the reason is that they have no `.nuspec`. A rule set
-document yields its `id`, `version`, `requires`, inputs and state fields, and nothing about
-who published it or what it is for. **They are the only place hand-written prose enters the
-registry**, which is one more reason they are worth doing after plugins rather than alongside.
+There is no exception to that anywhere in the registry, and §5 is the reason there is not:
+the one kind of entry that would have needed prose written by hand is the one no longer here.
 
 ### 4.2 What a new version costs
 
@@ -153,55 +149,60 @@ to write anything if one disagrees. The permanence rule is enforced mechanically
 schedule, while the file a human reads does not move — which is the shape the whole split was
 for.
 
-## 5. Rule sets are the second currency
+## 5. Rule sets are not here, and the argument that they should be
 
-Almost every package ecosystem has one kind of thing in it. This one has two, and the reason
-is a claim Rulealize makes about itself: **a rule set is data — it ships, versions and diffs
-on its own, and the same host binary runs a different set of rules.** That claim needs
-somewhere to publish one, or it stays a property of a repository nobody visits.
+They were, for most of the life of this document, and the case read well. Almost every
+package ecosystem has one kind of thing in it; this one appeared to have two, because
+Rulealize claims that **a rule set is data — it ships, versions and diffs on its own, and the
+same host binary runs a different set of rules.** A claim like that seems to need somewhere
+to publish one, or it stays a property of a repository nobody visits.
 
-Four things follow from admitting them, none of which apply to plugins.
+Four findings took it apart, and they are recorded because three of them only appeared while
+building the plugin half.
 
-### 5.1 The key needs a publisher scope, and the document does not change
+**There is nothing to govern.** §1 rests the whole case for a registry on a collision no
+other party can see. A rule set key would need a publisher scope, and that scope is best
+taken from the repository's owner — where it is verifiable, unclaimable and needs no policy
+at all. Nothing to allocate means nothing that only a registry can do.
 
-A plugin identifier is vendor-qualified already — `Rulealize.Plugin.Grid`,
-`Acme.Deploy.Rules` — because `requires` names plugins **across** documents, so those names
-have to be globally unique inside the document itself.
+**git has no immutable, enumerable version list.** nuget.org gives an (id, version) that
+cannot change and can be listed, which is what makes deriving instead of trusting possible
+and what makes a new plugin version cost nothing (§4.2). A tag can be moved, so an entry
+would have to pin a commit, and every new version would need a pull request. The property
+that made the plugin half cheap does not transfer.
 
-A rule set identifier is bare: `"id": "chess"`. The second person to publish chess collides
-with the first. But a rule set's identifier is only ever read within one deployment — a
-state document names `chess@1.0.0` to say which rules it belongs to, and nothing outside
-names it at all. **So the scope can be added outside the document**: the registry key is
-`reny/chess`, and `chess.json` is published unmodified. Vendor-qualifying rule set
-identifiers the way plugins are qualified would be paying, in every document, for a
-uniqueness only the index requires.
+**Verifying one costs the resolver.** Deciding whether a rule set compiles means resolving
+its `requires` against the catalogue, fetching those plugins and loading them — which is the
+Phase 3 resolver, arriving early. Not an objection by itself, but it prices the entry.
 
-### 5.2 Validity is machine-checkable, and it is the same check the library advertises
+**Nothing installs a rule set.** `requires` names plugins; nothing anywhere names a rule set.
+It is not a unit that another document depends on, so listing one supplies no mechanism —
+only a link. The package-registry analogy this document leaned on stops exactly here.
 
-Everything decidable about a rule set is decided in `CreateContext`. So the registry's
-verdict on a submitted rule set is not a review — it is a compile, and the badge says
-exactly what happened:
+### 5.1 The compatibility sweep went with it
 
-```
-compiles against Grid 1.1.0, Sequence 1.2.0, State 1.0.0, … — checked 2026-08-11
-```
+One function was genuinely registry-shaped and survived the four above: when a plugin
+releases 2.0, which documents whose `requires` said `^1.0` stop resolving? Only a party
+holding the catalogue and a list of documents can answer that, and it is what `^` was cut
+down to three constraint forms to express.
 
-Re-run nightly, this also catches the ecosystem-level event nothing else observes: a plugin
-releases 2.0, and every rule set whose `requires` said `^1.0` stops resolving. That is
-precisely what `^` was cut down to three constraint forms to express, and the registry is
-the only place its consequences are visible in aggregate.
+It does not survive a simpler question: **where do the documents come from?** Obtaining them
+is what the entry format was for, and removing the format removes the input. Pointing the
+sweep at Rulealize's own `ruleset/` looks like an answer and is not — those seven are already
+compiled by that repository's own tests, against plugins by the same author, so the sweep
+would report what its own CI already reports. A sweep is worth building when there is a
+document in it that somebody else wrote, and obtaining one is the unsolved problem rather
+than a step within it.
 
-### 5.3 The bytes have to be somewhere
+### 5.2 What is left
 
-The repository and tag are the truth; the registry caches a copy of the JSON. It cannot run
-§5.2 without the bytes, and a few kilobytes of text is not what "not a package host" was
-protecting against.
+**The registry is a plugin registry.** The site may still show what a rule set looks like,
+since Rulealize's `ruleset/` is public and reading it needs no submission format. The
+resolver still resolves a `requires`, because the rule set it reads is the user's own file on
+their own disk.
 
-### 5.4 A rule set is content, not code
-
-It needs a license field of its own, and the submission policy needs one line that plugins
-never needed: **the rules of a commercial game are somebody's, and a gallery of rule sets
-invites exactly that submission.** Better answered once, in writing, than per pull request.
+Listing rule sets and consuming them are different things, and only the second was ever
+load-bearing.
 
 ## 6. The ledger
 
@@ -325,12 +326,12 @@ submitted — querying nuget.org for packages depending on `Rulealize.Abstractio
 the pull request that would admit one. That is when the registry stops being a gate and
 becomes a view, and it is gated on §6's deadline.
 
-**3 — the resolver.** `rulealize restore ruleset/reversi.json` reads `requires`, resolves it
-against the index, and materialises a plugin folder.
+**3 — the resolver.** `rulealize restore my-rules.json` reads `requires`, resolves it against
+the index, and materialises a plugin folder. The document it reads is the user's own, on
+their own disk; the registry supplies the vocabulary, never the rules.
 
-**The resolver is the actual product; the site is its visualisation.** Rulealize's README
-currently opens the door with fourteen `git clone` lines. The ecosystem exists on the day
-that is one command.
+**The resolver is the actual product; the site is its visualisation.** It is also, after §5,
+the only thing here that a rule set ever touches — which is the right amount.
 
 ## 10. Decided, settled by building it, and still open
 
@@ -338,9 +339,8 @@ that is one command.
 
 - An index over NuGet, **not a package host**
 - Facts are derived by loading the artifact. **No manifest file, in any phase** (§2)
-- Three kinds of entry; operations are derived and never submitted (§4)
-- Rule sets are first class, keyed `<publisher>/<id>` **without changing the document**, and
-  validated by compiling them (§5)
+- Two kinds of entry; operations are derived and never submitted (§4)
+- **Plugins only.** Rule sets were admitted as a second kind and are not here (§5)
 - The ledger is the registry's reason to exist. Prefixes are granted by review; by default
   none (§6)
 - "Verified" means CI reproduced the build from tagged source, and nothing about purity (§7)
@@ -424,13 +424,14 @@ Two consequences worth recording, because neither was obvious before doing it:
 
 ### Open
 
-- **The rule set entry.** The plugin half of the index is settled (§4.1); rule sets are not,
-  and they are where the hand-written half of a submission lives. Deliberately left until the
-  plugin half is running end to end
-- **When the site goes public.** The constraint is one-sided — before the first third-party
-  plugin, not after (§6) — and the date is not chosen
-- **Whether a rule set may require a plugin that is not in the index at all**, which is the
-  `AddPlugin` case: `sample/Deploy` requires `Acme.Deploy.Rules`, a vocabulary that is
-  correctly not published anywhere. Such a rule set cannot be compiled by CI, so §5.2 has no
-  verdict to give it — and refusing it would exclude precisely the documents that
-  demonstrate the feature
+- **When the site goes public** is not a date and will not become one. The constraint is
+  one-sided — before the first third-party plugin, not after (§6) — and within that, it goes
+  up when it is ready. The ledger itself is already public, which is the half that had the
+  deadline; the site is the half that has the standard
+That is the whole list. **A rule set naming a vocabulary that is on no feed** — the
+`AddPlugin` case, and `sample/Deploy` requiring `Acme.Deploy.Rules` — was an open question
+here for a while, and it was never the registry's to answer. That `requires` may name a
+plugin nobody published is a fact about Rulealize, settled in Rulealize, and a runtime
+without the vocabulary refuses the document exactly as intended. It reached this document
+only because the registry had taken on rule sets and would have had to say something about
+compiling one. With §5, there is nothing to say.

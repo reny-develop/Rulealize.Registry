@@ -1,8 +1,8 @@
 # Rulealize.Registry
 
-The index of the [Rulealize](https://github.com/reny-develop/Rulealize) ecosystem: which
-plugin provides an operation, which plugins a rule set needs, and which namespaces and
-shorthand characters are already spoken for.
+The index of the [Rulealize](https://github.com/reny-develop/Rulealize) plugin ecosystem:
+which plugin provides an operation, which versions satisfy a rule set's `requires`, and which
+namespaces and shorthand characters are already spoken for.
 
 > **Status — early.** What exists is the claim ledger, the tool that derives it, and the job
 > that holds a pull request to it. There is no site, and nothing beyond the standard
@@ -85,17 +85,21 @@ never been loaded together, and that is exactly the pair that collides.
 An index is the only party that does. That ledger is this repository's first job and the
 only part of it that cannot be added later.
 
-## What it will index
+## What it indexes
 
 | | |
 | --- | --- |
 | **plugin** | submitted as a package identifier. Everything recorded is derived by loading it |
 | **operation** | `grid.ray`, `rec.keys` — derived from the above, never submitted |
-| **rule set** | submitted as a repository and a tag, and validated by compiling it |
 
-Rule sets are here on equal footing because Rulealize's claim is that a rule set is data —
-it ships, versions and diffs on its own, and the same host binary runs a different set of
-rules. That needs somewhere to publish one.
+**Rule sets are not indexed here**, though for most of this design's life they were going to
+be. There is no scarce name to govern, git offers no immutable enumerable version list to
+derive from, and nothing anywhere depends on a rule set — `requires` names plugins and
+nothing names a document. Listing one would have supplied a link and no mechanism.
+[`doc/design.md` §5](doc/design.md) is the full account.
+
+The resolver still reads a `requires`. The rule set it reads is the user's own file, on their
+own disk: **the registry supplies the vocabulary, never the rules.**
 
 ## What it will never be
 
