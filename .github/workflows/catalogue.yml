@@ -49,11 +49,41 @@ jobs:
       - name: Build the catalogue
         run: >
           dotnet run --project tool/Catalogue --
-          ledger/claim.json work/probe/Rulealize.Registry.Ledger.dll site
+          ledger/claim.json work/probe/Rulealize.Registry.Ledger.dll catalogue
+
+      # Built on every run, including the ones that will not publish anything. Holding the
+      # deploy step is the whole of what "the site is not up yet" means; holding the build
+      # too would leave the generator as the one part of this never exercised, broken on the
+      # day it matters.
+      - name: Render the pages
+        run: dotnet run --project tool/Site -- catalogue site
 
       # Not committed: it is derived from nuget.org on every run, and a generated file in the
       # history would be one more thing that can disagree with what the packages say.
       - uses: actions/upload-artifact@v4
         with:
-          name: catalogue
+          name: site
           path: site
+
+      - uses: actions/upload-pages-artifact@v3
+        if: github.ref == 'refs/heads/main' && vars.PUBLISH_SITE == 'true'
+        with:
+          path: site
+
+  # One repository variable away from being live, and deliberately: doc/design.md §8.1 puts
+  # only publishing behind the flag, so everything above has already run and been looked at
+  # by the time anybody sets it. Set PUBLISH_SITE to true in the repository's variables, and
+  # enable Pages with "GitHub Actions" as the source.
+  publish:
+    needs: build
+    if: github.ref == 'refs/heads/main' && vars.PUBLISH_SITE == 'true'
+    runs-on: ubuntu-latest
+    permissions:
+      pages: write
+      id-token: write
+    environment:
+      name: github-pages
+      url: ${{ steps.deploy.outputs.page_url }}
+    steps:
+      - id: deploy
+        uses: actions/deploy-pages@v4

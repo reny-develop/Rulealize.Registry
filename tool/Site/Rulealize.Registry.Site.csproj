@@ -1,0 +1,19 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <TargetFramework>net10.0</TargetFramework>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+    <IsPackable>false</IsPackable>
+    <RootNamespace>Rulealize.Registry.Site</RootNamespace>
+  </PropertyGroup>
+
+  <!--
+    No reference to Rulealize, and none to anything else. This reads the catalogue's JSON and
+    writes HTML, which makes it the first consumer of the published API rather than a second
+    path to the same data: if the files at /index.json and /plugin/<id>.json are not enough
+    to build a page, they are not enough for anybody else either.
+  -->
+
+</Project>

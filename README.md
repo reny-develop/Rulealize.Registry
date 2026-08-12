@@ -85,6 +85,26 @@ never been loaded together, and that is exactly the pair that collides.
 An index is the only party that does. That ledger is this repository's first job and the
 only part of it that cannot be added later.
 
+## The site
+
+[`tool/Site`](tool/Site/) renders the catalogue as pages: the claim table, a plugin page per
+entry, and a page per operation, because `grid.ray` is what somebody arrives holding and
+knowing which vocabulary owns it is the question nuget.org structurally cannot answer.
+
+```sh
+dotnet run --project tool/Site -- catalogue site
+```
+
+It reads `/index.json` and `/plugin/<id>.json` and nothing else — no reference to Rulealize,
+none to the catalogue's code — so it is the first consumer of the published API rather than a
+second path to the same facts. The search on the front page fetches `/index.json` like any
+other client would.
+
+**It is not up yet.** CI renders it on every run and uploads it, so the generator is
+exercised whether or not anything is published; deploying is one repository variable
+(`PUBLISH_SITE`) and enabling Pages. Holding the build too would leave the generator as the
+one part never run, broken on the day it matters.
+
 ## What it indexes
 
 | | |

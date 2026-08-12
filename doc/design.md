@@ -387,6 +387,23 @@ the only thing here that a rule set ever touches — which is the right amount.
   put in their `.nuspec` and a page will eventually put it on screen, so the catalogue keeps
   `< > & ' "` escaped while letting other scripts through unescaped — a Japanese description
   stays itself instead of becoming six times its length in `\uXXXX`
+- **[`tool/Site`](../tool/Site/) is built**, and it references nothing — not Rulealize, not
+  the catalogue's code. It reads `/index.json` and `/plugin/<id>.json` and writes HTML, which
+  makes it **the first consumer of the published API rather than a second path to the same
+  data**: if those files are not enough to build a page, they are not enough for anybody else
+  either. The front page's search fetches `/index.json` the way any other client would, for
+  the same reason
+- **There is a page per operation and no document per operation.** `grid.ray` is the thing a
+  reader arrives holding — a name out of a rule set or an error message, with no way to know
+  which vocabulary owns it — so the question needs a URL. It needs no third copy of the data
+  to answer it
+- **Everything a publisher wrote is escaped on the way onto a page.** A description is theirs,
+  not ours; a registry that renders one unescaped is a registry where one publisher writes the
+  page every other plugin is read on
+- **Publishing is one repository variable**, and everything before it runs regardless.
+  Holding the build as well would leave the generator as the one part never exercised, broken
+  on the day it matters — so CI renders the pages on every run and only the deploy step reads
+  the flag
 - **A namespace cannot be reserved before its package exists**, which had been left open here
   and is settled in [the grant policy](policy.md#no-claim-before-a-package). It turned out not
   to be the judgement call it looked like: an entry is derived by loading an assembly, so a
@@ -427,7 +444,8 @@ Two consequences worth recording, because neither was obvious before doing it:
 - **When the site goes public** is not a date and will not become one. The constraint is
   one-sided — before the first third-party plugin, not after (§6) — and within that, it goes
   up when it is ready. The ledger itself is already public, which is the half that had the
-  deadline; the site is the half that has the standard
+  deadline; the site is the half that has the standard. It is built, rendered on every CI run
+  and downloadable from it; what is left is setting `PUBLISH_SITE` and turning Pages on
 That is the whole list. **A rule set naming a vocabulary that is on no feed** — the
 `AddPlugin` case, and `sample/Deploy` requiring `Acme.Deploy.Rules` — was an open question
 here for a while, and it was never the registry's to answer. That `requires` may name a
