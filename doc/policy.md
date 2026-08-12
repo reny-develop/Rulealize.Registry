@@ -28,6 +28,14 @@ application's own assembly and handed to `AddPlugin` — is under the same oblig
 no entry here. It cannot collide with the ledger, but it can collide with a package that
 comes along later, and by then its rule sets are in production.
 
+**Publish under the identifier your manifest declares.** The runtime does not enforce this —
+`requires` names a `PluginManifest.Id`, and where a package with that name lives is the
+publisher's business — but two things already depend on the two strings being one string:
+this registry fetches a submission by the identifier the ledger records, and
+[Rulealize.Cli](https://github.com/reny-develop/Rulealize.Cli) resolves a `requires` by asking
+nuget.org for exactly the name the document wrote. A plugin published under a different
+package identifier cannot be admitted here and cannot be restored by anybody.
+
 ## Namespaces
 
 Everything an operation is called begins with one: `grid.ray`, `acme.frozen`. **First come**,
