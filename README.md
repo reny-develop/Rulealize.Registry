@@ -21,8 +21,8 @@ exactly one owner across the whole ecosystem**, and three of them are already sp
 | `$` | `Rulealize.Plugin.State` | `state` |
 | `#` | `Rulealize.Plugin.Definition` | `def` |
 
-The twelve namespaces taken are `bind`, `branch`, `cmp`, `def`, `grid`, `logic`, `math`,
-`rec`, `seq`, `state`, `tuple` and `type`, between them providing 68 operations.
+The namespaces taken are `bind`, `branch`, `cmp`, `def`, `grid`, `logic`, `math`,
+`rec`, `seq`, `state`, `tuple` and `type`.
 
 Nothing in that file is written by hand. [`tool/Ledger`](tool/Ledger/) points a `RuleRuntime`
 at a folder of assemblies and writes down what came back, which is the same folder scan a

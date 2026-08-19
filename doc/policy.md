@@ -41,7 +41,7 @@ package identifier cannot be admitted here and cannot be restored by anybody.
 Everything an operation is called begins with one: `grid.ray`, `acme.frozen`. **First come**,
 recorded when the package is published, with two limits.
 
-**Reserved.** The twelve the standard distribution holds, and a short list held against
+**Reserved.** Those the standard distribution holds, and a short list held against
 plugins that do not exist yet — `str`, `time`, `set`, `fmt`. These are refused rather than
 granted. A general name the standard distribution would obviously want should not be spent by
 whoever asked first, because unlike an identifier there is no supply of others.

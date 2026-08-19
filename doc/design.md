@@ -221,7 +221,7 @@ advice — "a vocabulary with an audience of one should not spend one" — is **
 convention to the grant policy**. The published table of what is taken is the registry's
 plainest artifact and its most durable one.
 
-Reserved ahead of anyone asking: the twelve standard namespaces, and the handful an obvious
+Reserved ahead of anyone asking: the standard distribution's namespaces, and the handful an obvious
 future standard plugin would want (`str`, `time`, `set`, `fmt`). A squatter on `str` costs
 the ecosystem a name it cannot buy back.
 
@@ -350,8 +350,8 @@ the only thing here that a rule set ever touches — which is the right amount.
 ### Settled by building it
 
 - **`RuleRuntime.Operations` is built**, and §3.1's claim held: it is one read-only property.
-  Pointed at the standard distribution it reports **68 operations across the twelve
-  plugins** — 53 expressions, 6 effects and 9 schema nodes
+  Pointed at the standard distribution it reports **every operation every plugin
+  registered**, each with the kind of node it builds
 - **[`tool/Ledger`](../tool/Ledger/) is built**, and it is what §3 said it would be: a host
   that calls `LoadPluginsFrom` and writes down what came back. It names no plugin, carries no
   list of the standard twelve, and reads nothing but the DLLs
@@ -371,7 +371,8 @@ the only thing here that a rule set ever touches — which is the right amount.
   even when a plugin registers none of one. A ledger records claims, and "claimed no
   shorthand character" is a claim
 - **[`tool/Catalogue`](../tool/Catalogue/) is built**, and against the real feed it produces
-  12 plugin entries and a 10 KB index. Its check refuses to write anything at all when a
+  an entry per plugin and an index small enough to search client-side. Its check refuses to
+  write anything at all when a
   version's claims disagree with the ledger, which was worth having the negative case for:
   a partial catalogue written beside a failure is a catalogue somebody will serve
 - **The catalogue loads no plugin, and cannot.** `PluginProbe` uses `Assembly.LoadFrom` into
