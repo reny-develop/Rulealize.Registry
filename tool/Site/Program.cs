@@ -218,7 +218,7 @@ static async Task Write(string path, string title, string root, string body) =>
         <footer>
         <a href="https://github.com/reny-develop/Rulealize.Registry">Repository</a>
         <a href="https://github.com/reny-develop/Rulealize.Registry/blob/main/doc/policy.md">Grant policy</a>
-        <a href="https://github.com/reny-develop/Rulealize.Registry/blob/main/ledger/claim.json">Ledger</a>
+        <a href="https://github.com/reny-develop/Rulealize.Registry/blob/main/ledger/submitted.json">Ledger</a>
         <a href="https://github.com/reny-develop/Rulealize">Rulealize</a>
         </footer>
         </body>

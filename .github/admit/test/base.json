@@ -1,31 +1,7 @@
 {
-  "$schema": "rulealize/registry/ledger/v1",
+  "$schema": "rulealize/registry/ledger/submitted/v1",
   "plugins": [
-    {
-      "id": "Rulealize.Plugin.Arithmetic",
-      "admitted": "1.0.0",
-      "namespace": "math",
-      "prefix": null,
-      "operations": {
-        "expression": [
-          "math.add"
-        ],
-        "effect": [],
-        "schema": []
-      }
-    },
-    {
-      "id": "Rulealize.Plugin.Binding",
-      "admitted": "1.0.0",
-      "namespace": "bind",
-      "prefix": "@",
-      "operations": {
-        "expression": [
-          "bind.let"
-        ],
-        "effect": [],
-        "schema": []
-      }
-    }
+    { "id": "Rulealize.Plugin.Arithmetic", "version": "1.0.0", "namespace": "math", "prefix": null },
+    { "id": "Rulealize.Plugin.Binding", "version": "1.0.0", "namespace": "bind", "prefix": "@" }
   ]
 }

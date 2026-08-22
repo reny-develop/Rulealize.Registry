@@ -2,17 +2,24 @@
 #
 # Decides whether a pull request may merge without a person reading it.
 #
-# Everything a submission can get wrong about its own claims is already decided by
-# ledger.yml, which fetches the packages and re-derives the file. This script decides a
-# different question: whether the change is the *shape* a submission has. A pull request that
-# adds a row and touches nothing else has nothing left for a person to judge; anything else
-# is held, and the person is told which of these it was.
+# Whether a submission is true is decided elsewhere, by fetching the packages and loading
+# them. This decides a different question: whether the change is the *shape* a submission
+# has. A pull request that adds a line to the submitted list and touches nothing else has
+# nothing left for a person to judge; anything else is held, and the person is told which of
+# these it was.
 #
 # It reads data and never runs any of it. The workflow calling it checks out the base branch
 # for this script and for the reserved list, so a pull request cannot edit either to admit
 # itself — and rule 2 refuses that pull request anyway.
 #
-#   gate.sh <base claim.json> <head claim.json> <reserved.json> <changed files>
+# The namespace and the shorthand character are read from what the submission states rather
+# than from the package, because finding out what a package really claims means loading it,
+# and this runs where a token that can merge is in the environment. A submission that states
+# something other than the truth is refused by declared.sh, in the job where no token is —
+# and a required check that fails is a pull request that never merges, which is the whole of
+# what this needs from it.
+#
+#   gate.sh <base submitted.json> <head submitted.json> <reserved.json> <changed files>
 #
 # Exit 0 admits and prints nothing. Exit 1 holds and prints the reasons as markdown, which
 # the workflow posts as the comment. Exit 2 is a usage error.
@@ -28,7 +35,7 @@ if ! command -v jq >/dev/null; then
 fi
 
 if [[ $# -ne 4 ]]; then
-    echo "usage: gate.sh <base claim.json> <head claim.json> <reserved.json> <changed files>" >&2
+    echo "usage: gate.sh <base submitted.json> <head submitted.json> <reserved.json> <changed files>" >&2
     exit 2
 fi
 
@@ -38,6 +45,8 @@ reserved=$3
 files=$4
 base_ref=${BASE_REF:-main}
 draft=${DRAFT:-false}
+
+policy=https://github.com/reny-develop/Rulealize.Registry/blob/main/doc/policy.md
 
 held=()
 hold() { held+=("$1"); }
@@ -51,40 +60,45 @@ if [[ "$draft" == "true" ]]; then
     hold "It is a draft."
 fi
 
-# 2. What it touches. An allowlist of one path: the workflows, the tools and the reserved
-# list are all things this gate trusts, so a change to any of them is a change to the gate.
+# 2. What it touches. An allowlist of one path: the ledger itself is written by CI, and the
+# workflows, the tools and the reserved list are all things this gate trusts, so a change to
+# any of them is a change to the gate.
 changed=$(grep -v '^[[:space:]]*$' "$files" | sort -u)
-if [[ "$changed" != "ledger/claim.json" ]]; then
-    hold "It changes more than the ledger. Only \`ledger/claim.json\` merges without review:
+if [[ "$changed" != "ledger/submitted.json" ]]; then
+    hold "It changes more than the submitted list. Only \`ledger/submitted.json\` merges without review:
 $(sed 's/^/  - `/;s/$/`/' <<<"$changed")"
 fi
 
 if [[ ! -s "$head" ]] || ! jq -e . "$head" >/dev/null 2>&1; then
-    hold "\`ledger/claim.json\` is missing or is not valid JSON."
+    hold "\`ledger/submitted.json\` is missing or is not valid JSON."
     printf '%s\n\n' "${held[@]}"
     exit 1
 fi
 
-# 3. Additions only. The file is generated, sorted and formatted the one way, so an entry
-# added in the right place is the only edit that produces no removed line. That makes this
-# single comparison the whole of "no existing claim was withdrawn, moved or rewritten" —
-# which matters because re-derivation cannot see a deletion: a row that is gone names no
-# package to fetch, and the ledger it regenerates matches.
-removed=$(diff "$base" "$head" | grep '^<')
-if [[ -n "$removed" ]]; then
-    hold "It removes or rewrites lines that were already in the ledger. [A claim is permanent](https://github.com/reny-develop/Rulealize.Registry/blob/main/doc/policy.md#a-claim-is-permanent):
-\`\`\`
-$removed
+# 3. Additions only. Every entry that was there has to still be there, unchanged, and this
+# compares the entries themselves rather than the lines they are written on — a submission
+# that sorts last moves the comma on the line above it, and that is punctuation rather than
+# somebody's claim going missing.
+#
+# It matters because the ledger is derived from this file: an entry taken out of it is a
+# claim taken away from whoever made it, and re-derivation cannot notice. The ledger it
+# rebuilds from what is left agrees with itself perfectly.
+removed=$(jq --slurpfile head "$head" '.plugins - $head[0].plugins' "$base" 2>/dev/null)
+if [[ -z "$removed" ]]; then
+    hold "\`ledger/submitted.json\` could not be read as a submitted list."
+    printf '%s\n\n' "${held[@]}"
+    exit 1
+fi
+
+if [[ "$(jq 'length' <<<"$removed")" -ne 0 ]]; then
+    hold "It removes or rewrites entries that were already submitted. [A claim is permanent](${policy}#a-claim-is-permanent):
+\`\`\`json
+$(jq -r '.[] | tostring' <<<"$removed")
 \`\`\`"
 fi
 
-
-# An entry inserted in the wrong place is still a pure insertion, so the comparison above
-# passes it. Re-derivation would fail on it — the tool sorts — but the gate should not say a
-# pull request merges without review when it does not, and "the ledger is sorted" is one line
-# to check.
 if ! jq -e '.plugins | map(.id) == (map(.id) | sort)' "$head" >/dev/null 2>&1; then
-    hold "The entries are not in identifier order. Paste yours where the tool printed it."
+    hold "The entries are not in identifier order."
 fi
 
 added=$(jq -c --slurpfile base "$base" '.plugins - $base[0].plugins' "$head" 2>/dev/null)
@@ -98,27 +112,31 @@ if [[ "$(jq 'length' <<<"$added")" -eq 0 ]]; then
     hold "It adds no plugin."
 fi
 
-# 4. Each added row, against the parts of the policy that are decidable without a person.
+# 4. Each added line, against the parts of the policy that are decidable without a person.
 while IFS= read -r entry; do
     [[ -z "$entry" ]] && continue
     id=$(jq -r '.id // ""' <<<"$entry")
-    admitted=$(jq -r '.admitted // ""' <<<"$entry")
+    version=$(jq -r '.version // ""' <<<"$entry")
     namespace=$(jq -r '.namespace // ""' <<<"$entry")
     prefix=$(jq -r '.prefix // "null"' <<<"$entry")
 
-    # The identifier and the version are handed to `dotnet add package` by ledger.yml, so
-    # they are held to what nuget.org allows before they are handed anywhere.
+    # The identifier and the version are handed to `dotnet add package`, so they are held to
+    # what nuget.org allows before they are handed anywhere.
     if [[ ! "$id" =~ ^[A-Za-z0-9]([A-Za-z0-9._-]*[A-Za-z0-9])?$ ]]; then
         hold "\`$id\` is not a package identifier."
         continue
     fi
 
-    if [[ ! "$admitted" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
-        hold "\`$id\` writes \`admitted\` as \`$admitted\`, which is not a three-part version."
+    if [[ ! "$version" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
+        hold "\`$id\` writes \`version\` as \`$version\`, which is not a three-part version."
+    fi
+
+    if [[ ! "$namespace" =~ ^[a-z][a-z0-9]*$ ]]; then
+        hold "\`$id\` writes \`namespace\` as \`$namespace\`. A namespace is lowercase letters and digits, starting with a letter."
     fi
 
     if [[ "$prefix" != "null" ]]; then
-        hold "\`$id\` claims the shorthand character \`$prefix\`. [There are fewer than a dozen left](https://github.com/reny-develop/Rulealize.Registry/blob/main/doc/policy.md#shorthand-characters), and the default answer is no, so this one is decided by a person."
+        hold "\`$id\` claims the shorthand character \`$prefix\`. [There are fewer than a dozen left](${policy}#shorthand-characters), and the default answer is no, so this one is decided by a person."
     fi
 
     if jq -e --arg ns "$namespace" '.namespaces | index($ns)' "$reserved" >/dev/null; then
@@ -131,7 +149,7 @@ while IFS= read -r entry; do
     # refuses it, because a general name taken first is the one mistake here nobody can undo.
     vendor=${id%%.*}
     if [[ "$namespace" != "${vendor,,}" ]]; then
-        hold "\`$id\` claims the namespace \`$namespace\`, which is not its vendor segment (\`${vendor,,}\`). [Vendor-qualify](https://github.com/reny-develop/Rulealize.Registry/blob/main/doc/policy.md#namespaces), or wait for a person to read this one."
+        hold "\`$id\` claims the namespace \`$namespace\`, which is not its vendor segment (\`${vendor,,}\`). [Vendor-qualify](${policy}#namespaces), or wait for a person to read this one."
     fi
 done < <(jq -c '.[]' <<<"$added" 2>/dev/null)
 

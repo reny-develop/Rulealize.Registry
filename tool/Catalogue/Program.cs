@@ -14,10 +14,12 @@ using System.Xml.Linq;
 //
 //   dotnet run --project tool/Catalogue -- <ledger file> <probe> <output folder>
 //
-// The ledger is reviewed by a person and holds one row per plugin, because a claim is
-// permanent and cannot differ between versions. The catalogue is not reviewed by anybody and
-// holds one entry per version, because `requires` reads `^1.0` and an operation may be added
-// within a major. That difference is the whole reason these are two documents.
+// The ledger is the one file a person reads: one line per plugin, holding the three things a
+// plugin claims and the version they were claimed at, because a claim is permanent and cannot
+// differ between versions. The catalogue is not reviewed by anybody and holds one entry per
+// version, because `requires` reads `^1.0` and an operation may be added within a major. That
+// difference is the whole reason these are two documents. Operations are in neither the
+// ledger nor a submission — they are read out of the assemblies, here.
 //
 // It follows that a new version of a plugin already in the ledger needs no pull request at
 // all: nothing committed changes, and the catalogue picks it up the next time this runs.
@@ -64,7 +66,7 @@ foreach (JsonElement claim in ledger.RootElement.GetProperty("plugins").Enumerat
     string? prefix = claim.GetProperty("prefix").ValueKind is JsonValueKind.Null
         ? null
         : claim.GetProperty("prefix").GetString();
-    string admitted = claim.GetProperty("admitted").GetString()!;
+    string admitted = claim.GetProperty("version").GetString()!;
 
     List<string> versions = await ReleasedVersions(id);
     if (versions.Count is 0)

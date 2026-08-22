@@ -1,0 +1,18 @@
+{
+  "$schema": "rulealize/registry/ledger/submitted/v1",
+  "plugins": [
+    { "id": "Rulealize.Plugin.Arithmetic", "version": "1.0.0", "namespace": "math", "prefix": null },
+    { "id": "Rulealize.Plugin.Binding", "version": "1.0.0", "namespace": "bind", "prefix": "@" },
+    { "id": "Rulealize.Plugin.Branch", "version": "1.0.0", "namespace": "branch", "prefix": null },
+    { "id": "Rulealize.Plugin.Comparison", "version": "1.0.0", "namespace": "cmp", "prefix": null },
+    { "id": "Rulealize.Plugin.Definition", "version": "1.0.0", "namespace": "def", "prefix": "#" },
+    { "id": "Rulealize.Plugin.Graph", "version": "1.0.0", "namespace": "graph", "prefix": null },
+    { "id": "Rulealize.Plugin.Grid", "version": "1.1.0", "namespace": "grid", "prefix": null },
+    { "id": "Rulealize.Plugin.Logic", "version": "1.0.0", "namespace": "logic", "prefix": null },
+    { "id": "Rulealize.Plugin.Record", "version": "1.0.0", "namespace": "rec", "prefix": null },
+    { "id": "Rulealize.Plugin.Sequence", "version": "1.2.0", "namespace": "seq", "prefix": null },
+    { "id": "Rulealize.Plugin.State", "version": "1.0.0", "namespace": "state", "prefix": "$" },
+    { "id": "Rulealize.Plugin.Tuple", "version": "1.0.0", "namespace": "tuple", "prefix": null },
+    { "id": "Rulealize.Plugin.TypeSchema", "version": "1.1.0", "namespace": "type", "prefix": null }
+  ]
+}

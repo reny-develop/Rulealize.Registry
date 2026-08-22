@@ -15,7 +15,7 @@ two plugins that have never been loaded together, which is exactly the pair that
 An index is the only party that does, and moving that check earlier is the one thing here
 that cannot be retrofitted: by the time it is wanted, the colliding names are already spent.
 **A ledger is only a defence while other people can read it**, which is why
-[`ledger/claim.json`](../ledger/claim.json) and
+[`ledger/submitted.json`](../ledger/submitted.json) and
 [the table generated from it](https://reny-develop.github.io/Rulealize.Registry/) were public
 before the first third-party plugin shipped. Published later, a ledger records collisions
 instead of preventing them.
@@ -101,9 +101,9 @@ characters, which is why the burden falls the way it does.
 **A namespace cannot be reserved in advance.** Not as a courtesy, and not for a plugin that
 is nearly ready.
 
-This is not a judgement call — it follows from how the ledger is made. Every entry is derived
+This is not a judgement call — it follows from how the ledger is kept. Every entry is checked
 by loading an assembly, and there is nothing to load before a package exists. A reservation
-would have to be a claim written by hand that no artifact backs — the second declaration
+would have to be a claim that no artifact backs — the second declaration
 [this registry refuses](../README.md#what-it-will-never-be), arriving by a different door.
 
 The cost is real: a namespace can be taken while somebody is still building against it. The
@@ -111,8 +111,8 @@ answer is to publish `0.1.0` on the day the namespace is chosen. That is cheap, 
 every package feed already expects, and it makes the claim in the only way this registry is
 able to record one.
 
-[The reserved list](../ledger/reserved.json) is the one hand-written thing here, and it is the
-opposite of a claim: it grants nothing to anybody and exists only to refuse.
+[The reserved list](../ledger/reserved.json) is the one thing here that no package backs, and
+it is the opposite of a claim: it grants nothing to anybody and exists only to refuse.
 
 ## A claim is permanent
 
@@ -150,71 +150,51 @@ for one claim and one meaning: CI reproduced this package from its tagged source
 
 ## How to claim
 
-Open a pull request adding the plugin to [`ledger/claim.json`](../ledger/claim.json). CI
-fetches that package, re-derives the entry and fails on any difference, so the only part you
-can get wrong is which package you named.
-
-**Derive your entry rather than write it.** The tool that produced that file produces your row
-too: from a clone of this repository, point it at a folder holding your plugin and, given no
-output file, it writes what your assembly claims to standard output.
-
-```sh
-dotnet run --project tool/Ledger -- <your plugin folder>
-```
-
-What comes back is a whole ledger for that folder — a `$schema` and a `plugins` array — so a
-`plugin/` folder that `restore` has filled describes the standard vocabularies beside yours.
-Take your object out of that array, and put it in this one in identifier order, indented as it
-was printed:
+Open a pull request adding one line to [`ledger/submitted.json`](../ledger/submitted.json), in
+identifier order:
 
 ```json
-    {
-      "id": "Acme.Deploy.Rules",
-      "admitted": "0.1.0",
-      "namespace": "acme",
-      "prefix": null,
-      "operations": {
-        "expression": [
-          "acme.frozen"
-        ],
-        "effect": [],
-        "schema": []
-      }
-    },
+    { "id": "Acme.Deploy.Rules", "version": "0.1.0", "namespace": "acme", "prefix": null },
 ```
 
-`admitted` is the version those claims were read from, which is your `PluginManifest`'s and
-not your project file's. CI asks nuget.org for the package at exactly that string, so a
-manifest and a package version that have drifted apart fail here as a restore error rather
-than as a diff — the one failure in this file whose cause is not written on it. Raise the two
+That is the whole submission. **The operations are not in it** — nothing you write here has to
+be kept in step with a release, because the only list of what your plugin registers is the one
+CI reads out of your assembly.
+
+`version` is the release your claims are read at, and it is your `PluginManifest`'s version
+rather than your project file's. CI asks nuget.org for the package at exactly that string, so
+a manifest and a package version that have drifted apart are refused here. Raise the two
 together.
 
-All three kinds of operation are written even where you register none of one, and a plugin
-claiming no shorthand character writes `null` rather than leaving the field out — "claimed no
-shorthand character" is a claim, and one worth being able to see was made.
+`prefix` is `null` unless you are asking for a [shorthand character](#shorthand-characters),
+and it is written rather than left out: "claimed no shorthand character" is a claim, and one
+worth being able to see was made.
 
-The comparison is `diff -u` against a regenerated file, so the ordering and the layout above
-are part of what has to match. Pasting what the tool printed is why none of that is something
-you have to know.
+**Nothing you state is believed.** CI fetches the package, loads it, and refuses the pull
+request if the assembly says anything other than what the line says — a different namespace, a
+shorthand character you did not declare, a manifest version that is not the one it was fetched
+at, or a `PluginManifest.Id` that is not the package you named. You cannot record a claim your
+plugin does not make, and there is no field here you can fill in wrongly and be believed.
 
-Nothing else is submitted. The description, repository, licence and the version of
-`Rulealize.Abstraction` it was built against are read from the package; there is no field
-here for anything you would otherwise have to keep in step with a release.
+Nothing else is submitted. The description, repository and licence, the version of
+`Rulealize.Abstraction` you built against, and every operation you register are read from the
+package.
 
-A claim that collides shows up as a conflict with an existing entry, and is refused there
+A claim that collides shows up as a plugin folder that cannot be loaded, and is refused there
 rather than in somebody's application six months later. That is the whole of the exercise.
 
 ## What happens to your pull request
 
-**A submission that adds a row and touches nothing else merges when the checks pass.** Nobody
-reads it first. There is nothing left to read: the packages are fetched, the entry is
-re-derived from the assembly, and a claim that collides with one already made cannot be
-loaded beside it. Whether the claim is true is not an opinion anybody here holds.
+**A submission that adds one line and touches nothing else merges when the checks pass.**
+Nobody reads it first. There is nothing left to read: the package is fetched and loaded, every
+word of the line is held to what the assembly says, and a claim that collides with one already
+made cannot be loaded beside it. Whether the claim is true is not an opinion anybody here
+holds.
 
 Four things send one to a person instead, and none of them is a judgement about your plugin.
 
-1. It changes anything besides `ledger/claim.json`
-2. It removes or rewrites a row that was already there
+1. It changes anything besides `ledger/submitted.json`
+2. It removes or rewrites a line that was already there
 3. It claims a shorthand character, or a reserved namespace
 4. Its namespace is not the vendor segment of its identifier — `Acme.Deploy.Rules` claiming
    `deploy` rather than `acme`. First come is still the rule, and a general name is still

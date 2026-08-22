@@ -2,10 +2,10 @@
 # it does.
 #
 # Everything a submission can get wrong about its own claims is already decided by ledger.yml,
-# which fetches the packages and re-derives the file. This decides a different question:
-# whether the change is the shape a submission has. A pull request that adds a row and touches
-# nothing else has no judgement left in it, so it merges when the checks pass. Anything else
-# is held, labelled and assigned, and the reason is written on the pull request.
+# which fetches the package and loads it. This decides a different question: whether the
+# change is the shape a submission has. A pull request that adds one line to the submitted
+# list and touches nothing else has no judgement left in it, so it merges when the checks
+# pass. Anything else is held, labelled and assigned, and the reason is written on it.
 #
 # pull_request_target runs this file as it is on main, with a token that can merge — so the
 # gate reads the pull request as data and never runs a line of it. The only thing that comes
@@ -49,8 +49,8 @@ jobs:
           # The merge base rather than the tip of main: a submission opened before something
           # else merged has not removed what it never had.
           merge_base=$(git merge-base "origin/${BASE}" FETCH_HEAD)
-          git show "${merge_base}:ledger/claim.json" > work/base.json
-          git show "FETCH_HEAD:ledger/claim.json" > work/head.json 2>/dev/null || : > work/head.json
+          git show "${merge_base}:ledger/submitted.json" > work/base.json
+          git show "FETCH_HEAD:ledger/submitted.json" > work/head.json 2>/dev/null || : > work/head.json
 
           gh api --paginate "repos/${GITHUB_REPOSITORY}/pulls/${PR}/files" --jq '.[].filename' > work/files.txt
 
@@ -97,10 +97,10 @@ jobs:
             gh pr edit "$PR" --remove-label needs-review 2>/dev/null || true
 
             if [[ "$DRY_RUN" == "true" ]]; then
-              body="This adds a plugin and touches nothing else, so it would merge as soon as the checks pass. Auto-merge is not enabled yet: the gate is in dry run while it is watched."
+              body="This submits a plugin and touches nothing else, so it would merge as soon as the checks pass. Auto-merge is not enabled yet: the gate is in dry run while it is watched."
             else
               gh pr merge "$PR" --auto --squash
-              body="This adds a plugin and touches nothing else, so there is nothing here for a person to decide. It merges as soon as the checks pass — the ledger is re-derived from the package you named, and that is what decides whether the claim is true."
+              body="This submits a plugin and touches nothing else, so there is nothing here for a person to decide. It merges as soon as the checks pass — the ledger is derived by loading the package you named, and that is what decides whether what you wrote is true."
             fi
           else
             # Auto-merge survives a force-push, so a pull request that was admitted and has
@@ -122,8 +122,10 @@ jobs:
           body="${marker}
           ${body}"
 
+          # --jq runs once per page, so the tail is what keeps this one identifier rather than
+          # one per page on a pull request long enough to have several.
           existing=$(gh api --paginate "repos/${GITHUB_REPOSITORY}/issues/${PR}/comments" \
-            --jq "[.[] | select(.body | startswith(\"${marker}\")) | .id] | last // empty")
+            --jq "[.[] | select(.body | startswith(\"${marker}\")) | .id] | last // empty" | tail -1)
 
           if [[ -n "$existing" ]]; then
             gh api -X PATCH "repos/${GITHUB_REPOSITORY}/issues/comments/${existing}" -f body="$body" >/dev/null
