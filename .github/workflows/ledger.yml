@@ -34,12 +34,6 @@ jobs:
         with:
           dotnet-version: '10.0.x'
 
-      # NuGet.config adds a folder feed beside the repository, which exists on a workstation
-      # with the other repositories cloned and not on a runner. An empty directory satisfies
-      # the source without offering anything, so every package resolves from nuget.org.
-      - name: Provide the local feed as an empty directory
-        run: mkdir -p "${GITHUB_WORKSPACE}/../LocalNuGet"
-
       # One project referencing exactly the packages the ledger names, published so that the
       # assemblies land in one folder. What else lands there does not matter: LoadPluginsFrom
       # sweeps a folder and passes over assemblies with no plugin in them, which is why

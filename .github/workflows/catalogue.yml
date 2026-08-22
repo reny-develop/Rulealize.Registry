@@ -35,12 +35,6 @@ jobs:
         with:
           dotnet-version: '10.0.x'
 
-      # NuGet.config adds a folder feed beside the repository, which exists on a workstation
-      # and not on a runner. An empty directory satisfies the source without offering
-      # anything, so every package resolves from nuget.org.
-      - name: Provide the local feed as an empty directory
-        run: mkdir -p "${GITHUB_WORKSPACE}/../LocalNuGet"
-
       # The catalogue loads no plugin — one process cannot hold two versions of the same
       # assembly — and runs this once per version instead.
       - name: Build the probe
