@@ -2,6 +2,19 @@
   "$schema": "rulealize/registry/ledger/v1",
   "plugins": [
     {
+      "id": "Acme.Deploy.Rules",
+      "admitted": "0.1.0",
+      "namespace": "deploy",
+      "prefix": "!",
+      "operations": {
+        "expression": [
+          "deploy.frozen"
+        ],
+        "effect": [],
+        "schema": []
+      }
+    },
+    {
       "id": "Rulealize.Plugin.Arithmetic",
       "admitted": "1.0.0",
       "namespace": "math",
