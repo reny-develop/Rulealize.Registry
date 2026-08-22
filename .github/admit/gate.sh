@@ -11,16 +11,13 @@
 # The rest split in two, and they are not the same thing:
 #
 #   - most of it is the submitter's to fix. A version in the wrong format, an entry out of
-#     order, a namespace somebody else may not have. They push a change and this runs again.
+#     order, a name somebody else may not have. They push a change and this runs again.
 #     Nobody else has to be told, and nobody else can help
-#   - three of them are the maintainer's. A shorthand character, because there are fewer than
-#     a dozen left and the answer is normally no. A line somebody else's claim was on, because
-#     that is a mistake or an attack. A pull request that is not a submission at all, because
-#     it might be a perfectly good change to the tools
+#   - the other is a pull request that is not a submission. This repository indexes plugins
+#     and takes nothing else, so that one is closed with a note saying where to raise it
 #
-# Telling the second from the first is the whole reason this prints a verdict rather than a
-# yes or a no. A queue that fills up with pull requests their own authors could fix is a queue
-# nobody reads.
+# Neither waits on anybody. Telling them apart is the whole reason this prints a verdict
+# rather than a yes or a no.
 #
 # It reads data and never runs any of it. The workflow calling it checks out the base branch
 # for this script and for the reserved list, so a pull request cannot edit either to admit
@@ -35,9 +32,9 @@
 #
 #   gate.sh <base submitted.json> <head submitted.json> <reserved.json> <changed files>
 #
-# Exit 0 admits and prints nothing. Exit 1 is for the maintainer and exit 3 is for the
-# submitter; both print the reasons as markdown, which the workflow posts as the comment.
-# Exit 2 is a usage error.
+# Exit 0 admits and prints nothing. Exit 1 says this is not a submission and exit 3 says it is
+# one the submitter has to put right; both print the reasons as markdown, which the workflow
+# posts as the comment. Exit 2 is a usage error.
 #
 # BASE_REF and DRAFT come from the pull request; both default to the admitting case, so the
 # fixtures only set what they are testing.
@@ -62,19 +59,20 @@ base_ref=${BASE_REF:-main}
 draft=${DRAFT:-false}
 
 policy=https://github.com/reny-develop/Rulealize.Registry/blob/main/doc/policy.md
+reserved_list=https://github.com/reny-develop/Rulealize.Registry/blob/main/ledger/reserved.json
 
 reasons=()
-maintainer=0
+elsewhere=0
 
 # Something the submitter can put right by pushing again.
 fix() { reasons+=("$1"); }
 
-# Something only the maintainer can answer.
-review() { reasons+=("$1"); maintainer=1; }
+# Not a submission, and this repository takes nothing else.
+close() { reasons+=("$1"); elsewhere=1; }
 
 verdict() {
     printf '%s\n\n' "${reasons[@]}"
-    [[ $maintainer -eq 1 ]] && exit 1
+    [[ $elsewhere -eq 1 ]] && exit 1
     exit 3
 }
 
@@ -87,12 +85,12 @@ if [[ "$draft" == "true" ]]; then
     fix "It is a draft."
 fi
 
-# 2. What it touches. An allowlist of one path: the reserved list, the workflows and the tools
-# are all things this gate trusts, so a change to any of them is a change to the gate. That
-# does not make it a bad change — it makes it one somebody reads.
+# 2. What it touches. An allowlist of one path: this repository indexes plugins and takes
+# nothing else through a pull request, and the reserved list, the workflows and the tools are
+# all things this gate trusts — a change to any of them is a change to the gate.
 changed=$(grep -v '^[[:space:]]*$' "$files" | sort -u)
 if [[ "$changed" != "ledger/submitted.json" ]]; then
-    review "It changes more than the submitted list, so it is not only a submission:
+    close "It changes more than the submitted list:
 $(sed 's/^/  - `/;s/$/`/' <<<"$changed")"
 fi
 
@@ -116,7 +114,7 @@ if [[ -z "$removed" ]]; then
 fi
 
 if [[ "$(jq 'length' <<<"$removed")" -ne 0 ]]; then
-    review "It removes or rewrites entries that were already submitted. [A claim is permanent](${policy}#a-claim-is-permanent):
+    fix "It removes or rewrites entries that were already submitted, and [a claim is permanent](${policy}#a-claim-is-permanent). Put them back:
 \`\`\`json
 $(jq -r '.[] | tostring' <<<"$removed")
 \`\`\`"
@@ -159,13 +157,20 @@ while IFS= read -r entry; do
         fix "\`$id\` writes \`namespace\` as \`$namespace\`. A namespace is lowercase letters and digits, starting with a letter."
     fi
 
-    if [[ "$prefix" != "null" ]]; then
-        review "\`$id\` claims the shorthand character \`$prefix\`. [There are fewer than a dozen left](${policy}#shorthand-characters), and the default answer is no, so this one is decided by a person."
+    if [[ "$prefix" != "null" && ${#prefix} -ne 1 ]]; then
+        fix "\`$id\` writes \`prefix\` as \`$prefix\`. A plugin claims one character or none."
     fi
 
-    if jq -e --arg ns "$namespace" '.namespaces | index($ns)' "$reserved" >/dev/null; then
-        fix "\`$id\` claims the [reserved namespace](https://github.com/reny-develop/Rulealize.Registry/blob/main/ledger/reserved.json) \`$namespace\`. Choose another one — that list grants nothing to anybody and exists only to refuse."
-    fi
+    for pair in namespace:namespaces prefix:prefixes; do
+        name=${pair%%:*}
+        field=${pair##*:}
+        value=${!name}
+        [[ "$name" == prefix && "$value" == "null" ]] && continue
+
+        if jq -e --arg field "$field" --arg value "$value" '.[$field] | index($value)' "$reserved" >/dev/null; then
+            fix "\`$id\` claims the [reserved ${name}](${reserved_list}) \`$value\`. Choose another — that list grants nothing to anybody and exists only to refuse."
+        fi
+    done
 done < <(jq -c '.[]' <<<"$added" 2>/dev/null)
 
 if [[ ${#reasons[@]} -gt 0 ]]; then

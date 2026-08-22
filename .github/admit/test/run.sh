@@ -71,9 +71,9 @@ derived() {
 
 ledger() { jq -n --argjson plugins "[$(printf '%s,' "$@" | sed 's/,$//')]" '{ plugins: $plugins }'; }
 
-# gate <name> <admit|review|fix> [reason] — the head submitted list on standard input.
-# "review" is the maintainer's queue; "fix" is the submitter's own, and never reaches anybody
-# but them.
+# gate <name> <admit|close|fix> [reason] — the head submitted list on standard input.
+# "close" means it is not a submission at all; "fix" is the submitter's own, and neither
+# waits on anybody.
 gate() {
     local name=$1 expect=$2 reason=${3:-} head="$work/head.json" files="$work/files.txt"
     cat > "$head"
@@ -88,7 +88,7 @@ gate() {
     status=$?
     case $status in
         0) actual=admit ;;
-        1) actual=review ;;
+        1) actual=close ;;
         3) actual=fix ;;
         *) actual="error($status)" ;;
     esac
@@ -135,21 +135,31 @@ gate admits-a-last-name admit <<<"$(jq --argjson z "$(submission Zeta.Rules zeta
 gate admits-a-general-name admit \
     <<<"$(jq --argjson e "$(submission Acme.Deploy.Rules deploy null)" "$insert" "$work/base.json")"
 
-gate reviews-a-removal review "removes or rewrites" \
+gate fixes-a-removal fix "removes or rewrites" \
     <<<"$(jq '.plugins |= map(select(.namespace != "bind"))' "$work/base.json")"
 
-gate reviews-a-rewrite review "removes or rewrites" <<<"$(jq --argjson e "$acme" \
+gate fixes-a-rewrite fix "removes or rewrites" <<<"$(jq --argjson e "$acme" \
     '.plugins = [$e] + (.plugins | map(if .namespace == "math" then .version = "2.0.0" else . end))' "$work/base.json")"
 
-gate reviews-a-shorthand review "shorthand character" \
+# A shorthand character is first come like a namespace, outside the reserved set. What it
+# costs whoever asks second is writing the operation out, which is what a namespace costs too.
+gate admits-a-shorthand admit \
     <<<"$(jq --argjson e "$(submission Acme.Deploy.Rules acme '"!"')" "$insert" "$work/base.json")"
 
+# Not this one. `|` separates a tuple's components inside its own text, so a plugin holding it
+# would swallow the text form of somebody else's value.
+gate fixes-a-reserved-prefix fix "reserved prefix" \
+    <<<"$(jq --argjson e "$(submission Acme.Deploy.Rules acme '"|"')" "$insert" "$work/base.json")"
+
+gate fixes-a-long-prefix fix "one character or none" \
+    <<<"$(jq --argjson e "$(submission Acme.Deploy.Rules acme '"!!"')" "$insert" "$work/base.json")"
+
 FILES=$'ledger/submitted.json\ntool/Ledger/Program.cs' \
-    gate reviews-another-file review "more than the submitted list" \
+    gate closes-another-file close "more than the submitted list" \
     <<<"$(jq --argjson e "$acme" "$insert" "$work/base.json")"
 
 FILES='ledger/reserved.json' \
-    gate reviews-the-reserved-list review "more than the submitted list" \
+    gate closes-the-reserved-list close "more than the submitted list" \
     <<<"$(jq --argjson e "$acme" "$insert" "$work/base.json")"
 
 # Everything below is the submitter's own to put right, and reaches nobody else.
@@ -180,11 +190,11 @@ DRAFT=true \
     gate fixes-a-draft fix "is a draft" \
     <<<"$(jq --argjson e "$acme" "$insert" "$work/base.json")"
 
-# A submission that is both — a shorthand character asked for on a pull request that also has
-# a version in the wrong format. The maintainer's queue wins, because the part only they can
-# answer does not stop being true when something else is wrong as well.
-gate reviews-both-at-once review "shorthand character" \
-    <<<"$(jq --argjson e "$(submission Acme.Deploy.Rules acme '"!"' 1.0)" "$insert" "$work/base.json")"
+# Both at once — a version in the wrong format on a pull request that also changes something
+# else. Closing wins: fixing the version would not make this a submission.
+FILES=$'ledger/submitted.json\nREADME.md' \
+    gate closes-both-at-once close "more than the submitted list" \
+    <<<"$(jq --argjson e "$(submission Acme.Deploy.Rules acme null 1.0)" "$insert" "$work/base.json")"
 
 echo
 echo "declared:"
@@ -221,6 +231,10 @@ declared refuses-a-drifted-version refuses "$submitted" \
 declared refuses-an-operation-elsewhere refuses "$submitted" \
     "$(jq -c '.plugins[0].operations.expression = ["grid.ray"]' <<<"$truth")" \
     "which is not in its namespace"
+
+declared refuses-a-reserved-prefix refuses "$submitted" \
+    "$(ledger "$(derived Acme.Deploy.Rules acme '"|"')")" \
+    "reserved shorthand character"
 
 declared refuses-a-reserved-namespace refuses \
     "$(jq -n --argjson p "[$(submission Str.Tools str null)]" '{ plugins: $p }')" \

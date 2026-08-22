@@ -1,13 +1,13 @@
 # Says something, to somebody, when this repository needs a person.
 #
-# Everything else here is built to run without one, which is exactly why this exists: a daily
-# job that quietly went red, or a submission the gate held six weeks ago, is invisible until
-# somebody thinks to look. Nobody thinks to look at a registry that works.
+# It is the only thing here that ever does. Everything a pull request can be — a submission,
+# a submission with a mistake in it, or not a submission at all — is answered where it was
+# opened and waits on nobody. What is left is this: a run that went red on main, which nothing
+# else would ever mention, because nobody thinks to look at a registry that works.
 #
-# Both routes are Issues rather than mail from the runner, because an Issue is a thing that
-# stays open until it is dealt with, and because a repository that is watched turns one into
-# mail anyway. The mention is there so that it arrives even for a notification setting of
-# participating-and-mentions.
+# An Issue rather than mail from the runner, because an Issue stays open until it is dealt
+# with. The mention in it is what delivers: a mention notifies whether or not the repository
+# is watched, which is what lets the owner watch nothing and still hear about this.
 
 name: alert
 
@@ -15,14 +15,11 @@ on:
   workflow_run:
     workflows: [catalogue, ledger, gate]
     types: [completed]
-  schedule:
-    - cron: '0 5 * * 1'
   workflow_dispatch:
 
 permissions:
   contents: read
   issues: write
-  pull-requests: read
 
 jobs:
   # A run that went red on main. Not on a pull request: those are red at the author, who can
@@ -64,45 +61,3 @@ jobs:
             gh issue create --title "$title" --body "$body" --label ci-failure
           fi
 
-  # What the gate held. A comment rather than an edit, every week, because an edited comment
-  # notifies nobody — which is the whole failure this job exists to avoid.
-  pending:
-    if: github.event_name != 'workflow_run'
-    runs-on: ubuntu-latest
-
-    steps:
-      - name: Report the queue
-        env:
-          GH_TOKEN: ${{ github.token }}
-          # This job checks nothing out, so gh has no repository to infer from a working copy.
-          GH_REPO: ${{ github.repository }}
-          OWNER: ${{ github.repository_owner }}
-        run: |
-          set -euo pipefail
-          gh label create needs-review --color FBCA04 --description "Held for a person to read" 2>/dev/null || true
-
-          waiting=$(gh pr list --label needs-review --state open --json number,title,createdAt \
-            --jq '.[] | "- #\(.number) \(.title) — open since \(.createdAt | split("T")[0])"')
-
-          title="Submissions waiting for a person"
-          number=$(gh issue list --label needs-review --state open --json number,title \
-            --jq "[.[] | select(.title == \"${title}\") | .number] | first // empty")
-
-          if [[ -z "$waiting" ]]; then
-            if [[ -n "$number" ]]; then
-              gh issue close "$number" --comment "Nothing is waiting."
-            fi
-            exit 0
-          fi
-
-          body="@${OWNER} — the gate held these, and they merge for nobody until you read them:
-
-          ${waiting}
-
-          Each one carries a comment saying which rule held it."
-
-          if [[ -n "$number" ]]; then
-            gh issue comment "$number" --body "$body"
-          else
-            gh issue create --title "$title" --body "$body" --label needs-review
-          fi
