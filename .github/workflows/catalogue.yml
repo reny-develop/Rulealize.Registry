@@ -26,6 +26,11 @@ jobs:
   build:
     runs-on: ubuntu-latest
 
+    outputs:
+      plugins: ${{ steps.counts.outputs.plugins }}
+      versions: ${{ steps.counts.outputs.versions }}
+      operations: ${{ steps.counts.outputs.operations }}
+
     steps:
       - uses: actions/checkout@v4
 
@@ -48,6 +53,18 @@ jobs:
         run: >
           dotnet run --project tool/Catalogue --
           ledger/submitted.json work/probe/Rulealize.Registry.Ledger.dll catalogue
+
+      # What the crawl found, for the run this leaves behind on the checks branch. Read out of
+      # the catalogue rather than counted along the way, so it is the published file talking.
+      - name: Count what was found
+        id: counts
+        run: |
+          set -euo pipefail
+          {
+            echo "plugins=$(jq '.plugins | length' catalogue/index.json)"
+            echo "operations=$(jq '.operations | length' catalogue/index.json)"
+            echo "versions=$(jq -s '[.[].versions | length] | add' catalogue/plugin/*.json)"
+          } >> "$GITHUB_OUTPUT"
 
       # Built on every run, including the ones that will not publish: a pull request, or any
       # ref that is not main. Holding the deploy step was the whole of what "the site is not
@@ -85,3 +102,77 @@ jobs:
     steps:
       - id: deploy
         uses: actions/deploy-pages@v4
+
+  # One line per run, on a branch of its own.
+  #
+  # It is here for a reason that has nothing to do with what it records: GitHub disables a
+  # scheduled workflow in a public repository after 60 days with no repository activity, and
+  # this repository is meant to go quiet. What counts as activity is not documented, so
+  # whether a push made with GITHUB_TOKEN resets that clock is not something this can promise
+  # — it is the cheapest thing that might, and it costs a branch nobody has to read.
+  #
+  # `checks` rather than main, because a daily commit on main would bury the one submission a
+  # month that matters under thirty that do not. It is also the record that outlives the
+  # ninety days Actions keeps a log for, which is the part worth having either way.
+  #
+  # It runs whatever the build did, so a run that went red is a line that says so.
+  heartbeat:
+    needs: build
+    if: always() && github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Record the run
+        env:
+          RESULT: ${{ needs.build.result }}
+          PLUGINS: ${{ needs.build.outputs.plugins }}
+          VERSIONS: ${{ needs.build.outputs.versions }}
+          OPERATIONS: ${{ needs.build.outputs.operations }}
+        run: |
+          set -euo pipefail
+          checked=$(date -u +%Y-%m-%dT%H:%M:%SZ)
+
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+
+          if git ls-remote --exit-code --heads origin checks >/dev/null 2>&1; then
+            git fetch --quiet origin checks
+            git checkout --quiet -B checks origin/checks
+          else
+            # The first run. An orphan so that main's history is not dragged along behind a
+            # file that has nothing to do with it.
+            git checkout --quiet --orphan checks
+            git rm -r --quiet --cached .
+          fi
+
+          jq -nc \
+            --arg checked "$checked" \
+            --arg run "$GITHUB_RUN_ID" \
+            --arg result "$RESULT" \
+            --arg plugins "${PLUGINS:-}" \
+            --arg versions "${VERSIONS:-}" \
+            --arg operations "${OPERATIONS:-}" \
+            'def num: if . == "" then null else tonumber end;
+             {
+               checked: $checked,
+               run: ($run | tonumber),
+               result: $result,
+               plugins: ($plugins | num),
+               versions: ($versions | num),
+               operations: ($operations | num)
+             }' >> log.jsonl
+
+          git add log.jsonl
+          git commit --quiet -m "Checked ${checked}"
+
+          git push --quiet origin checks || {
+            git fetch --quiet origin checks
+            git rebase --quiet origin/checks
+            git push --quiet origin checks
+          }
+
+          tail -1 log.jsonl >> "$GITHUB_STEP_SUMMARY"

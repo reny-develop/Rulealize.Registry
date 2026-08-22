@@ -305,6 +305,12 @@ static void WriteCatalogue(List<PluginEntry> plugins, string folder)
         writer.WriteStartObject();
         writer.WriteString("$schema", "rulealize/registry/index/v1");
 
+        // When this was last read out of nuget.org. The ledger carries no timestamp because
+        // it is compared against a regeneration and a date would be a difference every time;
+        // this file is compared against nothing and published, and the one question a reader
+        // cannot answer without it is whether they are looking at something still being kept.
+        writer.WriteString("checked", DateTimeOffset.UtcNow.ToString("yyyy-MM-dd'T'HH:mm:ss'Z'"));
+
         writer.WritePropertyName("plugins");
         writer.WriteStartArray();
         foreach (PluginEntry plugin in plugins)

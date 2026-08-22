@@ -64,6 +64,23 @@ report $? "does not put a javascript: URL in an href"
 ! grep -rqF --include='*.html' "<script>alert('description')</script>" "$work/url"
 report $? "escapes a description that is markup"
 
+# `checked` is the catalogue's own, not a publisher's, but it reaches the footer of every page
+# and there is no reason for it to be the one string that goes through unescaped.
+! grep -rqF --include='*.html' "<script>alert(1)</script>" "$work/url"
+report $? "escapes the checked timestamp"
+
+grep -rq --include='*.html' 'Last checked' "$work/url"
+report $? "says when the catalogue was checked"
+
+# 3. A catalogue from before there was a timestamp to say. Leaving the line off is the honest
+# answer; inventing one, or refusing to render, would both be worse.
+mkdir -p "$work/plain"
+(cd "$root" && dotnet run --project tool/Site -c Release -- tool/Site/test/plain "$work/plain" > /dev/null 2>&1)
+report $? "renders a catalogue that does not say when it was checked"
+
+! grep -rq --include='*.html' 'Last checked' "$work/plain"
+report $? "leaves the line off rather than inventing one"
+
 echo
 if [[ $failed -gt 0 ]]; then
     echo "$failed failed."

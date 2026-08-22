@@ -1,6 +1,7 @@
 // Copyright (c) 2026 Reny
 // Licensed under the Apache License, Version 2.0.
 
+using System.Globalization;
 using System.Net;
 using System.Text;
 using System.Text.Json;
@@ -38,6 +39,12 @@ Directory.CreateDirectory(Path.Combine(output, "plugin"));
 Directory.CreateDirectory(Path.Combine(output, "op"));
 
 using JsonDocument index = JsonDocument.Parse(await File.ReadAllTextAsync(Path.Combine(catalogue, "index.json")));
+
+// Every page says when the catalogue was last read out of nuget.org, because an index nobody
+// is keeping looks exactly like one that is until it says so. It is carried on the class
+// rather than passed to Write, which is a static local function and cannot capture it; an
+// older catalogue that does not have the field leaves the line off rather than lying about it.
+Program.CheckedAt = Text(index.RootElement, "checked");
 
 List<Plugin> plugins = [];
 foreach (JsonElement summary in index.RootElement.GetProperty("plugins").EnumerateArray())
@@ -161,6 +168,14 @@ static string H(string? text) => WebUtility.HtmlEncode(text ?? string.Empty);
 static string? Link(string? url) =>
     Uri.TryCreate(url, UriKind.Absolute, out Uri? parsed) && parsed.Scheme is "http" or "https" ? url : null;
 
+// The catalogue records the second it was read; a page wants the day. Anything that is not a
+// timestamp is shown as it is — escaped, like everything else — rather than dropped, because a
+// footer that quietly says nothing is how a broken field stays broken.
+static string Day(string value) =>
+    DateTimeOffset.TryParse(value, CultureInfo.InvariantCulture, DateTimeStyles.RoundtripKind, out DateTimeOffset when)
+        ? when.UtcDateTime.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture)
+        : value;
+
 // A namespace, a dot, and a member that starts lowercase and carries only letters and digits:
 // grid.ray, seq.elementAt. Every operation in the standard distribution is one, the runtime
 // requires only the namespace it prefixes, and this is what makes the rest of it a name.
@@ -220,6 +235,7 @@ static async Task Write(string path, string title, string root, string body) =>
         <a href="https://github.com/reny-develop/Rulealize.Registry/blob/main/doc/policy.md">Grant policy</a>
         <a href="https://github.com/reny-develop/Rulealize.Registry/blob/main/ledger/submitted.json">Ledger</a>
         <a href="https://github.com/reny-develop/Rulealize">Rulealize</a>
+        {(CheckedAt is null ? "" : $"<span class=\"checked\">Last checked {H(Day(CheckedAt))}</span>")}
         </footer>
         </body>
         </html>
@@ -458,6 +474,9 @@ internal sealed record Plugin(
 
 internal static partial class Program
 {
+    /// <summary>When the catalogue these pages were built from was read, if it says.</summary>
+    internal static string? CheckedAt { get; set; }
+
     // One stylesheet, no framework, no build step. Both themes are defined because a reader
     // arrives in whichever one their system is set to, and a page that only looks right in
     // one of them looks broken in the other.
@@ -519,5 +538,8 @@ internal static partial class Program
           border-top: 1px solid var(--line); padding-top: 1rem; padding-bottom: 2rem;
           font-size: .875rem; display: flex; gap: 1.25rem; flex-wrap: wrap;
         }
+        /* Pushed to the end of the row: it is the one thing here that is not a link, and the
+           one thing worth reading twice on a page somebody suspects is stale. */
+        .checked { margin-left: auto; color: var(--dim); }
         """;
 }

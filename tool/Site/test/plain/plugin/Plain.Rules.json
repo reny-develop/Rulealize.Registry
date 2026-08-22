@@ -1,0 +1,24 @@
+{
+  "id": "Plain.Rules",
+  "namespace": "hostile",
+  "prefix": null,
+  "admitted": "1.0.0",
+  "latest": "1.0.0",
+  "description": "A plugin with nothing wrong with it.",
+  "repository": "https://example.invalid/plain",
+  "license": "MIT",
+  "versions": [
+    {
+      "version": "1.0.0",
+      "abstraction": "1.0.0",
+      "framework": "net10.0",
+      "operations": {
+        "expression": [
+          "hostile.one"
+        ],
+        "effect": [],
+        "schema": []
+      }
+    }
+  ]
+}
