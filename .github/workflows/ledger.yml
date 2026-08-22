@@ -84,7 +84,11 @@ jobs:
           BASE: ${{ github.base_ref }}
         run: |
           set -euo pipefail
-          git show "origin/${BASE}:ledger/submitted.json" > work/base.json
+          # A base without the file is a ledger with nothing in it, which makes every entry
+          # here a new one. That is true of the pull request that introduces the file, and it
+          # is the right answer for any other branch that has not got it yet.
+          git show "origin/${BASE}:ledger/submitted.json" > work/base.json 2>/dev/null \
+            || echo '{ "plugins": [] }' > work/base.json
 
           added=$(jq -r --slurpfile base work/base.json \
             '[.plugins[].id] - [$base[0].plugins[].id] | .[]' ledger/submitted.json)
