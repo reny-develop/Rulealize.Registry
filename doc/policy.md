@@ -153,37 +153,43 @@ fetches that package, re-derives the entry and fails on any difference, so the o
 can get wrong is which package you named.
 
 **Derive your entry rather than write it.** The tool that produced that file produces your row
-too: point it at a folder holding your plugin and, given no output file, it prints what your
-assembly claims.
+too: from a clone of this repository, point it at a folder holding your plugin and, given no
+output file, it writes what your assembly claims to standard output.
 
 ```sh
 dotnet run --project tool/Ledger -- <your plugin folder>
 ```
 
-It prints one object per plugin the folder holds, so a `plugin/` folder that `restore` has
-filled prints the standard vocabularies beside yours. Take yours, and put it in the `plugins`
-array in identifier order.
+What comes back is a whole ledger for that folder — a `$schema` and a `plugins` array — so a
+`plugin/` folder that `restore` has filled describes the standard vocabularies beside yours.
+Take your object out of that array, and put it in this one in identifier order, indented as it
+was printed:
 
 ```json
-{
-  "id": "Acme.Deploy.Rules",
-  "admitted": "0.1.0",
-  "namespace": "acme",
-  "prefix": null,
-  "operations": {
-    "expression": [
-      "acme.frozen"
-    ],
-    "effect": [],
-    "schema": []
-  }
-}
+    {
+      "id": "Acme.Deploy.Rules",
+      "admitted": "0.1.0",
+      "namespace": "acme",
+      "prefix": null,
+      "operations": {
+        "expression": [
+          "acme.frozen"
+        ],
+        "effect": [],
+        "schema": []
+      }
+    },
 ```
 
-`admitted` is the version those claims were read from, which is the version CI goes and
-fetches. All three kinds of operation are written even where you register none of one, and a
-plugin claiming no shorthand character writes `null` rather than leaving the field out —
-"claimed no shorthand character" is a claim, and one worth being able to see was made.
+`admitted` is the version those claims were read from, which is your `PluginManifest`'s and
+not your project file's. CI asks nuget.org for the package at exactly that string, so a
+manifest and a package version that have drifted apart fail here as a restore error rather
+than as a diff — the one failure in this file whose cause is not written on it. Raise the two
+together.
+
+All three kinds of operation are written even where you register none of one, and a plugin
+claiming no shorthand character writes `null` rather than leaving the field out — "claimed no
+shorthand character" is a claim, and one worth being able to see was made.
 
 The comparison is `diff -u` against a regenerated file, so the ordering and the layout above
 are part of what has to match. Pasting what the tool printed is why none of that is something
