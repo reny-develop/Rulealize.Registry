@@ -78,6 +78,43 @@ foreach (JsonElement summary in index.RootElement.GetProperty("plugins").Enumera
     File.Copy(path, Path.Combine(output, "plugin", $"{id}.json"), overwrite: true);
 }
 
+// An operation name becomes a file name and a URL below. The runtime qualifies it with the
+// registering plugin's namespace and does not police the rest of it, so nothing upstream of
+// here makes `op` a name rather than a path. They are all checked before anything is written,
+// because the first thing a name that is a path would do is write outside this folder.
+string[] malformed =
+[
+    .. plugins
+        .SelectMany(static plugin => plugin.Releases)
+        .SelectMany(static release => release.Operations.Values)
+        .SelectMany(static names => names)
+        .Where(static op => !IsOperationName(op))
+        .Distinct(StringComparer.Ordinal)
+        .Order(StringComparer.Ordinal),
+];
+
+if (malformed.Length is not 0)
+{
+    Console.Error.WriteLine($"These are not operation names: {string.Join(", ", malformed)}");
+    return 1;
+}
+
+// The other string that becomes a path here. nuget.org allows nothing else in an identifier
+// and the ledger is fetched by it, so this is the belt to that brace.
+string[] impossible =
+[
+    .. plugins
+        .Select(static plugin => plugin.Id)
+        .Where(static id => id.Length is 0 || !id.All(static c => char.IsAsciiLetterOrDigit(c) || c is '.' or '_' or '-'))
+        .Order(StringComparer.Ordinal),
+];
+
+if (impossible.Length is not 0)
+{
+    Console.Error.WriteLine($"These are not package identifiers: {string.Join(", ", impossible)}");
+    return 1;
+}
+
 File.Copy(Path.Combine(catalogue, "index.json"), Path.Combine(output, "index.json"), overwrite: true);
 
 await File.WriteAllTextAsync(Path.Combine(output, "style.css"), Style, new UTF8Encoding(false));
@@ -116,6 +153,48 @@ static string? Text(JsonElement element, string name) =>
 // publisher's prose, and a registry that renders it unescaped is a registry that lets one
 // publisher write the page every other plugin is read on.
 static string H(string? text) => WebUtility.HtmlEncode(text ?? string.Empty);
+
+// The one string here that becomes an href rather than text, and it is whatever the publisher
+// put in their .nuspec. Escaping stops it closing the attribute; it does not stop
+// `javascript:`, which is a scheme and not a character. Anything that is not an absolute
+// http(s) URL is rendered as the text it is.
+static string? Link(string? url) =>
+    Uri.TryCreate(url, UriKind.Absolute, out Uri? parsed) && parsed.Scheme is "http" or "https" ? url : null;
+
+// A namespace, a dot, and a member that starts lowercase and carries only letters and digits:
+// grid.ray, seq.elementAt. Every operation in the standard distribution is one, the runtime
+// requires only the namespace it prefixes, and this is what makes the rest of it a name.
+static bool IsOperationName(string op)
+{
+    int dot = op.IndexOf('.');
+    if (dot < 1 || dot == op.Length - 1)
+    {
+        return false;
+    }
+
+    if (!char.IsAsciiLetterLower(op[0]) || !char.IsAsciiLetterLower(op[dot + 1]))
+    {
+        return false;
+    }
+
+    for (int i = 1; i < dot; i++)
+    {
+        if (!char.IsAsciiLetterLower(op[i]) && !char.IsAsciiDigit(op[i]))
+        {
+            return false;
+        }
+    }
+
+    for (int i = dot + 2; i < op.Length; i++)
+    {
+        if (!char.IsAsciiLetterOrDigit(op[i]))
+        {
+            return false;
+        }
+    }
+
+    return true;
+}
 
 static async Task Write(string path, string title, string root, string body) =>
     await File.WriteAllTextAsync(path, $"""
@@ -171,7 +250,9 @@ static string PluginBody(Plugin plugin)
 
     if (plugin.Repository is not null)
     {
-        body.Append($"<tr><th>Source</th><td><a href=\"{H(plugin.Repository)}\">{H(plugin.Repository)}</a></td></tr>");
+        body.Append(Link(plugin.Repository) is string source
+            ? $"<tr><th>Source</th><td><a href=\"{H(source)}\">{H(source)}</a></td></tr>"
+            : $"<tr><th>Source</th><td>{H(plugin.Repository)}</td></tr>");
     }
 
     body.Append(
@@ -240,9 +321,9 @@ static string OperationBody(string op, string kind, Plugin plugin)
         "<p>What it does is in that plugin's specification, which ships with the plugin and "
         + "changes when it releases");
 
-    if (plugin.Repository is not null)
+    if (Link(plugin.Repository) is string source)
     {
-        body.Append($" — <a href=\"{H(plugin.Repository)}/blob/main/doc/specification.md\">read it</a>");
+        body.Append($" — <a href=\"{H(source)}/blob/main/doc/specification.md\">read it</a>");
     }
 
     body.Append(".</p>");

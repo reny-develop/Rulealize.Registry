@@ -10,3 +10,8 @@
 # .editorconfig declares CRLF for C# source. Say the same thing here, so a
 # checkout and an editor cannot disagree about a file they both write.
 *.cs text eol=crlf
+
+# A shell script is run by bash, and bash reads a carriage return as part of the
+# command. These stay LF in a working copy as well as in the repository, on every
+# platform, because CI is not the only place they are meant to run.
+*.sh text eol=lf

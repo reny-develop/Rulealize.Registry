@@ -1,0 +1,24 @@
+{
+  "id": "Hostile.Rules",
+  "namespace": "hostile",
+  "prefix": null,
+  "admitted": "1.0.0",
+  "latest": "1.0.0",
+  "description": "A plugin that registered a path where a name goes.",
+  "repository": "https://example.invalid/hostile",
+  "license": "MIT",
+  "versions": [
+    {
+      "version": "1.0.0",
+      "abstraction": "1.0.0",
+      "framework": "net10.0",
+      "operations": {
+        "expression": [
+          "../../index"
+        ],
+        "effect": [],
+        "schema": []
+      }
+    }
+  ]
+}
