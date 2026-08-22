@@ -21,7 +21,7 @@ exactly one owner across the whole ecosystem**, and three of them are already sp
 | `$` | `Rulealize.Plugin.State` | `state` |
 | `#` | `Rulealize.Plugin.Definition` | `def` |
 
-The namespaces taken are `bind`, `branch`, `cmp`, `def`, `grid`, `logic`, `math`,
+The namespaces taken are `bind`, `branch`, `cmp`, `def`, `graph`, `grid`, `logic`, `math`,
 `rec`, `seq`, `state`, `tuple` and `type`.
 
 Nothing in that file is written by hand. [`tool/Ledger`](tool/Ledger/) points a `RuleRuntime`

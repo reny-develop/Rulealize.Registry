@@ -85,6 +85,25 @@
       }
     },
     {
+      "id": "Rulealize.Plugin.Graph",
+      "admitted": "1.0.0",
+      "namespace": "graph",
+      "prefix": null,
+      "operations": {
+        "expression": [
+          "graph.adjacent",
+          "graph.at",
+          "graph.reachable"
+        ],
+        "effect": [
+          "graph.set"
+        ],
+        "schema": [
+          "graph.of"
+        ]
+      }
+    },
+    {
       "id": "Rulealize.Plugin.Grid",
       "admitted": "1.1.0",
       "namespace": "grid",
