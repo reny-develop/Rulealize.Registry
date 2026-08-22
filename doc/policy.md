@@ -191,14 +191,26 @@ word of the line is held to what the assembly says, and a claim that collides wi
 made cannot be loaded beside it. Whether the claim is true is not an opinion anybody here
 holds.
 
-Four things send one to a person instead, and none of them is a judgement about your plugin.
+What stops one falls into two kinds, and only the second involves anybody else.
 
-1. It changes anything besides `ledger/submitted.json`
-2. It removes or rewrites a line that was already there
-3. It claims a shorthand character, or a reserved namespace
-4. Its namespace is not the vendor segment of its identifier — `Acme.Deploy.Rules` claiming
-   `deploy` rather than `acme`. First come is still the rule, and a general name is still
-   yours to ask for; it is the one grant here that nobody can undo, so it is not one a script
-   should be making at four in the morning
+**Yours to put right.** A version that is not three parts, an entry out of order, a namespace
+that is not lowercase, a [reserved](../ledger/reserved.json) name, a draft. The reason is
+written on the pull request, you push a change, and it is answered again. Nobody is told, and
+nobody could have helped.
 
-Held is not refused. It waits, it is labelled, and the reason is written on the pull request.
+**The maintainer's to answer.** Three things, and none of them is a judgement about your
+plugin.
+
+1. It claims a [shorthand character](#shorthand-characters) — there are fewer than a dozen
+   left, so this one is read rather than counted
+2. It removes or rewrites a line that was already there. [A claim is permanent](#a-claim-is-permanent),
+   so that is either a mistake or something worse
+3. It changes something besides `ledger/submitted.json` — which may be a perfectly good change
+   to the tools, and is simply not a submission
+
+Those are labelled, assigned, and left where they cannot be quietly forgotten. Held is not
+refused.
+
+A namespace that is not your vendor's — `Acme.Deploy.Rules` claiming `deploy` — is **not** on
+either list. It is first come like any other, and what it costs whoever asks second is some
+verbosity in their operation names and nothing else.

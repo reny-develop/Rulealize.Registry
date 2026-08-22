@@ -47,9 +47,11 @@ whether it is true.
 Which is why **a submission that adds one line and touches nothing else merges without anybody
 reading it**. [`admit.yml`](.github/workflows/admit.yml) checks that it is that and no more —
 the rules are in [`.github/admit/gate.sh`](.github/admit/gate.sh), one case each in
-[`.github/admit/test/`](.github/admit/test/) — and then waits for the checks. A shorthand
-character, a reserved namespace, a line that was already there, or a namespace that is not the
-plugin's vendor segment is held instead, labelled, and left for a person.
+[`.github/admit/test/`](.github/admit/test/) — and then waits for the checks. What it will not
+admit splits in two: most of it the submitter can put right by pushing again, and is written
+on their pull request and told to nobody else. Three things are the maintainer's — a shorthand
+character, a line somebody else's claim was on, and a pull request that is not a submission at
+all — and those are labelled, assigned and chased.
 [The grant policy](doc/policy.md#what-happens-to-your-pull-request) says which is which.
 
 ## The catalogue
