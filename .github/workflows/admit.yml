@@ -112,6 +112,7 @@ jobs:
             body="@${OWNER} — this one is held for you.
 
           ${REASONS}
+
           None of that means the submission is wrong; it means it is outside what merges without review. [The grant policy](https://github.com/reny-develop/Rulealize.Registry/blob/main/doc/policy.md) is what it is held to."
           fi
 
