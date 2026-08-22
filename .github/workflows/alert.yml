@@ -38,6 +38,8 @@ jobs:
       - name: Report it
         env:
           GH_TOKEN: ${{ github.token }}
+          # This job checks nothing out, so gh has no repository to infer from a working copy.
+          GH_REPO: ${{ github.repository }}
           OWNER: ${{ github.repository_owner }}
           NAME: ${{ github.event.workflow_run.name }}
           URL: ${{ github.event.workflow_run.html_url }}
@@ -72,6 +74,8 @@ jobs:
       - name: Report the queue
         env:
           GH_TOKEN: ${{ github.token }}
+          # This job checks nothing out, so gh has no repository to infer from a working copy.
+          GH_REPO: ${{ github.repository }}
           OWNER: ${{ github.repository_owner }}
         run: |
           set -euo pipefail
