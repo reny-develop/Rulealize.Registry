@@ -51,10 +51,10 @@ jobs:
           dotnet run --project tool/Catalogue --
           ledger/claim.json work/probe/Rulealize.Registry.Ledger.dll catalogue
 
-      # Built on every run, including the ones that will not publish anything. Holding the
-      # deploy step is the whole of what "the site is not up yet" means; holding the build
-      # too would leave the generator as the one part of this never exercised, broken on the
-      # day it matters.
+      # Built on every run, including the ones that will not publish: a pull request, or any
+      # ref that is not main. Holding the deploy step was the whole of what "the site is not
+      # up yet" meant, and holding the build too would have left the generator as the one
+      # part of this never exercised, broken on the day it mattered.
       - name: Render the pages
         run: dotnet run --project tool/Site -- catalogue site
 
@@ -70,10 +70,10 @@ jobs:
         with:
           path: site
 
-  # One repository variable away from being live, and deliberately: doc/design.md §8.1 puts
-  # only publishing behind the flag, so everything above has already run and been looked at
-  # by the time anybody sets it. Set PUBLISH_SITE to true in the repository's variables, and
-  # enable Pages with "GitHub Actions" as the source.
+  # Live: PUBLISH_SITE is set, and Pages takes its source from Actions. The flag stays
+  # because only publishing sits behind it — everything above runs
+  # either way, so a pull request still renders the pages it would deploy. Clearing the
+  # variable stops future deploys; what is published stays up until Pages itself is off.
   publish:
     needs: build
     if: github.ref == 'refs/heads/main' && vars.PUBLISH_SITE == 'true'

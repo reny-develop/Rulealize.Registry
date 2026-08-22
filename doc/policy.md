@@ -1,9 +1,24 @@
 # The grant policy
 
-What may be claimed, on what grounds, and what can never be taken back.
+What may be claimed, on what grounds, and what can never be taken back. This is what a
+submission is held to.
 
-This is the operative half of [the design record's §6](design.md#6-the-ledger). That section
-argues why a ledger has to exist; this one is what a submission is held to.
+## Why there is a ledger at all
+
+`OperationTable.Claim` refuses a plugin whose identifier, namespace or shorthand character
+another plugin already claimed. That check is right, and it runs **at the wrong end of the
+timeline** — at the moment somebody assembles a plugin folder, which is after both plugins
+were published and after rule sets naming them went into production. The runtime cannot do
+better; it only ever sees the plugins in front of it. **No participant in the ecosystem sees
+two plugins that have never been loaded together, which is exactly the pair that collides.**
+
+An index is the only party that does, and moving that check earlier is the one thing here
+that cannot be retrofitted: by the time it is wanted, the colliding names are already spent.
+**A ledger is only a defence while other people can read it**, which is why
+[`ledger/claim.json`](../ledger/claim.json) and
+[the table generated from it](https://reny-develop.github.io/Rulealize.Registry/) were public
+before the first third-party plugin shipped. Published later, a ledger records collisions
+instead of preventing them.
 
 ## The three claims
 
@@ -85,10 +100,9 @@ characters, which is why the burden falls the way it does.
 is nearly ready.
 
 This is not a judgement call — it follows from how the ledger is made. Every entry is derived
-by loading an assembly ([design.md §3](design.md#3-where-the-facts-come-from--the-validator-is-an-ordinary-host)),
-and there is nothing to load before a package exists. A reservation would have to be a claim
-written by hand that no artifact backs, which is the second declaration
-[§2](design.md#2-what-is-not-being-built) refuses, arriving by a different door.
+by loading an assembly, and there is nothing to load before a package exists. A reservation
+would have to be a claim written by hand that no artifact backs — the second declaration
+[this registry refuses](../README.md#what-it-will-never-be), arriving by a different door.
 
 The cost is real: a namespace can be taken while somebody is still building against it. The
 answer is to publish `0.1.0` on the day the namespace is chosen. That is cheap, it is what
@@ -115,12 +129,22 @@ everything the ledger records under it.
 **Quality, usefulness, and taste.** The ledger records claims; it does not rank vocabularies.
 
 **Purity.** Every operation is required to be a pure function of its arguments, and nothing
-this registry can run establishes that
-([design.md §7](design.md#7-what-the-registry-cannot-check-and-must-not-imply)). A submission
-is not asked to attest to it either, because an attestation nobody checks reads as one
-somebody did.
+this registry can run establishes that. `GetValidInputs` evaluates a guard once per candidate,
+so an impure operation turns a domain into a query storm and answers one question two ways
+inside one call — a defect that appears only under a large domain, which is to say in
+production and not in a submission. A submission is not asked to attest to purity either,
+because an attestation nobody checks reads as one somebody did.
+
+**Safety.** Loading a plugin is running its code: discovery is a folder scan, with no
+signature and no sandbox. That is reasonable for a runtime whose plugins are all its own
+author's, and it is exactly what an ecosystem changes — so this index says so as plainly as
+a package feed does, rather than implying an inspection it does not perform.
 
 **Whether an operation is a good idea.** If it loads and its claims are free, it is in.
+
+Nothing here will ever be labelled "verified" on any of those grounds. A badge that read as
+though purity or safety had been checked would be worse than no badge, so the word is kept
+for one claim and one meaning: CI reproduced this package from its tagged source.
 
 ## How to claim
 
