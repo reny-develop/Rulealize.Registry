@@ -56,10 +56,12 @@ package identifier cannot be admitted here and cannot be restored by anybody.
 Everything an operation is called begins with one: `grid.ray`, `acme.frozen`. **First come**,
 recorded when the package is published, with two limits.
 
-**Reserved.** Those the standard distribution holds, and a short list held against
-plugins that do not exist yet — `str`, `time`, `set`, `fmt`. These are refused rather than
-granted. A general name the standard distribution would obviously want should not be spent by
-whoever asked first, because unlike an identifier there is no supply of others.
+**Reserved.** Those the standard distribution holds, and a short list held against plugins
+that do not exist yet, in [`ledger/reserved.json`](../ledger/reserved.json) — `str`, `time`,
+`set`, `fmt` at the time of writing, and that file rather than this sentence is what CI
+refuses a claim against. A general name the standard distribution would obviously want should
+not be spent by whoever asked first, because unlike an identifier there is no supply of
+others.
 
 **Vendor-qualify a private vocabulary.** `acme`, not `deploy`. A namespace with an audience
 of one still occupies a name in a space everyone shares, which is why
@@ -109,8 +111,8 @@ answer is to publish `0.1.0` on the day the namespace is chosen. That is cheap, 
 every package feed already expects, and it makes the claim in the only way this registry is
 able to record one.
 
-The reserved list above is the one hand-written thing here, and it is the opposite of a
-claim: it grants nothing to anybody and exists only to refuse.
+[The reserved list](../ledger/reserved.json) is the one hand-written thing here, and it is the
+opposite of a claim: it grants nothing to anybody and exists only to refuse.
 
 ## A claim is permanent
 
@@ -201,3 +203,22 @@ here for anything you would otherwise have to keep in step with a release.
 
 A claim that collides shows up as a conflict with an existing entry, and is refused there
 rather than in somebody's application six months later. That is the whole of the exercise.
+
+## What happens to your pull request
+
+**A submission that adds a row and touches nothing else merges when the checks pass.** Nobody
+reads it first. There is nothing left to read: the packages are fetched, the entry is
+re-derived from the assembly, and a claim that collides with one already made cannot be
+loaded beside it. Whether the claim is true is not an opinion anybody here holds.
+
+Four things send one to a person instead, and none of them is a judgement about your plugin.
+
+1. It changes anything besides `ledger/claim.json`
+2. It removes or rewrites a row that was already there
+3. It claims a shorthand character, or a reserved namespace
+4. Its namespace is not the vendor segment of its identifier — `Acme.Deploy.Rules` claiming
+   `deploy` rather than `acme`. First come is still the rule, and a general name is still
+   yours to ask for; it is the one grant here that nobody can undo, so it is not one a script
+   should be making at four in the morning
+
+Held is not refused. It waits, it is labelled, and the reason is written on the pull request.

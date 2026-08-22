@@ -1,0 +1,31 @@
+{
+  "$schema": "rulealize/registry/ledger/v1",
+  "plugins": [
+    {
+      "id": "Rulealize.Plugin.Arithmetic",
+      "admitted": "1.0.0",
+      "namespace": "math",
+      "prefix": null,
+      "operations": {
+        "expression": [
+          "math.add"
+        ],
+        "effect": [],
+        "schema": []
+      }
+    },
+    {
+      "id": "Rulealize.Plugin.Binding",
+      "admitted": "1.0.0",
+      "namespace": "bind",
+      "prefix": "@",
+      "operations": {
+        "expression": [
+          "bind.let"
+        ],
+        "effect": [],
+        "schema": []
+      }
+    }
+  ]
+}

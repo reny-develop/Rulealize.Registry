@@ -1,0 +1,9 @@
+{
+  "$schema": "rulealize/registry/ledger/reserved/v1",
+  "namespaces": [
+    "fmt",
+    "set",
+    "str",
+    "time"
+  ]
+}
