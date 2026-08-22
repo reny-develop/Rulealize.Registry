@@ -1,10 +1,10 @@
 # Re-derives the claim ledger from the packages it names and fails if the result differs
 # from what is committed.
 #
-# This is what doc/design.md §3 means by deriving the facts rather than accepting them: a
-# pull request may say a plugin claims a namespace and provides an operation, and this job
-# is what decides whether that is true. Nothing here trusts the submitted file except for
-# the package identifiers and versions in it, which are what it goes and fetches.
+# This is what deriving the facts rather than accepting them means: a pull request may say
+# that a plugin claims a namespace and provides an operation, and this job is what decides
+# whether that is true. Nothing here trusts the submitted file except for the package
+# identifiers and versions in it, which are what it goes and fetches.
 #
 # There is deliberately no schedule. The ledger pins the version each plugin was admitted at,
 # so a scheduled re-derivation would reproduce the same file for ever and catch nothing.

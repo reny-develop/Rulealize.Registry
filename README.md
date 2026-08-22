@@ -4,10 +4,10 @@ The index of the [Rulealize](https://github.com/reny-develop/Rulealize) plugin e
 which plugin provides an operation, which versions satisfy a rule set's `requires`, and which
 namespaces and shorthand characters are already spoken for.
 
-> **Status — early.** What exists is the claim ledger, the tool that derives it, and the job
-> that holds a pull request to it. There is no site, and nothing beyond the standard
-> distribution is indexed yet. [`doc/design.md`](doc/design.md) says what will be built, in
-> what order, and what will not be.
+> **Status — early.** What exists is the claim ledger, the tools that derive it and the
+> catalogue from it, the jobs that hold a pull request to them, and the site — which is
+> [up](https://reny-develop.github.io/Rulealize.Registry/), labelled pre-release. Nothing
+> beyond the standard distribution is indexed yet.
 
 ## The ledger
 
@@ -71,6 +71,13 @@ Nothing hand-written goes into a plugin entry. The description, repository, lice
 abstraction version are in the `.nuspec`; the claims and operations are in the assembly. A
 submission is a package identifier.
 
+The abstraction version is worth recording because it is a whole class of failure a user
+otherwise meets as a `ReflectionTypeLoadException`, which the runtime can only report as
+"most likely built against a different version of `Rulealize.Abstraction`". Prose is linked
+rather than copied, for the reason a specification lives with its own plugin: it describes
+one version of one vocabulary and has to change when that plugin releases, so a copy here
+would ship on this repository's schedule and would eventually be wrong.
+
 ## Why this is not just a page on nuget.org
 
 A package feed distributes plugins perfectly well, and this repository does not try to
@@ -100,10 +107,14 @@ none to the catalogue's code — so it is the first consumer of the published AP
 second path to the same facts. The search on the front page fetches `/index.json` like any
 other client would.
 
-**It is not up yet.** CI renders it on every run and uploads it, so the generator is
-exercised whether or not anything is published; deploying is one repository variable
-(`PUBLISH_SITE`) and enabling Pages. Holding the build too would leave the generator as the
-one part never run, broken on the day it matters.
+**It is up**: <https://reny-develop.github.io/Rulealize.Registry/>. It carries `noindex` and
+says pre-release in its header, because what it indexes is still the standard distribution
+and nothing else.
+
+CI renders it on every run and uploads it whether or not that run will publish, so the
+generator is exercised either way and only the deploy step reads `PUBLISH_SITE`. Holding the
+build too would have left the generator as the one part never run, broken on the day it
+mattered.
 
 ## What it indexes
 
@@ -112,11 +123,14 @@ one part never run, broken on the day it matters.
 | **plugin** | submitted as a package identifier. Everything recorded is derived by loading it |
 | **operation** | `grid.ray`, `rec.keys` — derived from the above, never submitted |
 
-**Rule sets are not indexed here**, though for most of this design's life they were going to
-be. There is no scarce name to govern, git offers no immutable enumerable version list to
-derive from, and nothing anywhere depends on a rule set — `requires` names plugins and
-nothing names a document. Listing one would have supplied a link and no mechanism.
-[`doc/design.md` §5](doc/design.md) is the full account.
+**Rule sets are not indexed here**, though for most of this repository's design they were
+going to be. Three findings took the case apart. There is **no scarce name to govern**, so
+there is nothing only an index can do. **git offers no immutable, enumerable version list**
+to derive an entry from — a tag can be moved, so an entry would have to pin a commit and
+every version would need a pull request, which is exactly the property that makes a new
+plugin version cost nothing here. And **nothing anywhere depends on a rule set**: `requires`
+names plugins, and nothing names a document, so listing one would have supplied a link and
+no mechanism.
 
 The resolver still reads a `requires`. The rule set it reads is the user's own file, on their
 own disk: **the registry supplies the vocabulary, never the rules.**

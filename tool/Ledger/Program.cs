@@ -10,7 +10,7 @@ using Rulealize.Abstraction.Plugin;
 //
 //   dotnet run --project tool/Ledger -- <plugin folder> [<output file>]
 //
-// This is the whole of what doc/design.md §3 means by "the validator is an ordinary host".
+// The validator is an ordinary host, and this is the whole of what that means.
 // It builds a RuleRuntime, points LoadPluginsFrom at a folder, and reports what came back.
 // It knows no plugin by name, has no list of the standard twelve, and reads nothing beside
 // the DLLs — so there is no way for the ledger to describe a plugin differently from the way

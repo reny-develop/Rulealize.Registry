@@ -9,11 +9,11 @@ using System.Text.Json;
 //
 //   dotnet run --project tool/Site -- <catalogue folder> <output folder>
 //
-// The output holds the JSON as well as the HTML, because doc/design.md §8 makes the static
-// files the API: /index.json and /plugin/<id>.json are what the resolver and anything else
-// reads, and the pages are a second view of the same bytes rather than a separate build of
-// the same facts. The search on the front page fetches /index.json like any other client,
-// which is the cheapest way of finding out whether that file is usable.
+// The output holds the JSON as well as the HTML, because the static files are the API:
+// /index.json and /plugin/<id>.json are what the resolver and anything else reads, and the
+// pages are a second view of the same bytes rather than a separate build of the same facts.
+// The search on the front page fetches /index.json like any other client, which is the
+// cheapest way of finding out whether that file is usable.
 //
 // There is one page per operation. It holds nothing the plugin's page does not, and it exists
 // because `grid.ray` is the thing somebody has in their hand when they arrive — a name out of
