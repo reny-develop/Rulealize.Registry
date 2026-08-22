@@ -125,6 +125,13 @@ other client would.
 says pre-release in its header, because what it indexes is still the standard distribution
 and nothing else.
 
+Every page says in its footer when the catalogue was last read out of nuget.org, and
+`/index.json` carries the same stamp to the second. An index nobody is keeping looks exactly
+like one that is — the daily run could stop and every page would go on being served, correct
+about a world that had moved. The date is what says otherwise. The same run leaves one line
+per check on the [`checks`](../../tree/checks) branch, which is the record that outlives the
+ninety days a workflow log is kept for.
+
 CI renders it on every run and uploads it whether or not that run will publish, so the
 generator is exercised either way and only the deploy step reads `PUBLISH_SITE`. Holding the
 build too would have left the generator as the one part never run, broken on the day it

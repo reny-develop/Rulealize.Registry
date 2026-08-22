@@ -1,10 +1,9 @@
 {
   "plugins": [
     {
-      "id": "Hostile.Rules",
+      "id": "Plain.Rules",
       "namespace": "hostile",
       "operations": []
     }
-  ],
-  "checked": "<script>alert(1)</script>"
+  ]
 }
