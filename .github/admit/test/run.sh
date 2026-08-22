@@ -7,7 +7,7 @@
 # loading it. Every rule in each has a case that trips it, and both have an agreeing case
 # too, because a gate that never admits anything is the failure nobody notices.
 #
-# Each held case also states which reason it expects. Without that, a case that holds for the
+# Each refused case also states which reason it expects. Without that, a case that holds for the
 # wrong reason — a broken fixture, a missing tool — reads as a pass, and the rule it was
 # written for is never exercised again.
 #
@@ -16,7 +16,7 @@
 set -uo pipefail
 
 if ! command -v jq >/dev/null; then
-    echo "These cases need jq, and every one of them would report a hold without it." >&2
+    echo "These cases need jq, and every one of them would report a refusal without it." >&2
     exit 2
 fi
 
@@ -71,7 +71,9 @@ derived() {
 
 ledger() { jq -n --argjson plugins "[$(printf '%s,' "$@" | sed 's/,$//')]" '{ plugins: $plugins }'; }
 
-# gate <name> <admit|hold> [reason] — the head submitted list on standard input
+# gate <name> <admit|review|fix> [reason] — the head submitted list on standard input.
+# "review" is the maintainer's queue; "fix" is the submitter's own, and never reaches anybody
+# but them.
 gate() {
     local name=$1 expect=$2 reason=${3:-} head="$work/head.json" files="$work/files.txt"
     cat > "$head"
@@ -86,7 +88,8 @@ gate() {
     status=$?
     case $status in
         0) actual=admit ;;
-        1) actual=hold ;;
+        1) actual=review ;;
+        3) actual=fix ;;
         *) actual="error($status)" ;;
     esac
 
@@ -126,52 +129,62 @@ gate admits-two admit <<<"$(jq --argjson a "$acme" --argjson z "$(submission Zet
 gate admits-a-last-name admit <<<"$(jq --argjson z "$(submission Zeta.Rules zeta null)" \
     '.plugins = .plugins + [$z]' "$work/base.json")"
 
-gate holds-a-removal hold "removes or rewrites" \
-    <<<"$(jq '.plugins |= map(select(.namespace != "bind"))' "$work/base.json")"
-
-gate holds-a-rewrite hold "removes or rewrites" <<<"$(jq --argjson e "$acme" \
-    '.plugins = [$e] + (.plugins | map(if .namespace == "math" then .version = "2.0.0" else . end))' "$work/base.json")"
-
-gate holds-out-of-order hold "identifier order" \
-    <<<"$(jq --argjson e "$(submission Zeta.Rules zeta null)" "$insert" "$work/base.json")"
-
-gate holds-a-reserved-name hold "reserved namespace" \
-    <<<"$(jq --argjson e "$(submission Str.Tools str null)" "$insert" "$work/base.json")"
-
-gate holds-a-shorthand hold "shorthand character" \
-    <<<"$(jq --argjson e "$(submission Acme.Deploy.Rules acme '"!"')" "$insert" "$work/base.json")"
-
-gate holds-a-general-name hold "vendor segment" \
+# A namespace that is not the vendor segment of its identifier. First come is the rule, and a
+# general name costs the plugin that did not get it some verbosity and nothing else — so this
+# is nobody's to refuse and nobody's to sit on.
+gate admits-a-general-name admit \
     <<<"$(jq --argjson e "$(submission Acme.Deploy.Rules deploy null)" "$insert" "$work/base.json")"
 
-gate holds-a-bad-identifier hold "not a package identifier" \
-    <<<"$(jq --argjson e "$(submission 'Acme Rules; rm -rf /' acme null)" "$insert" "$work/base.json")"
+gate reviews-a-removal review "removes or rewrites" \
+    <<<"$(jq '.plugins |= map(select(.namespace != "bind"))' "$work/base.json")"
 
-gate holds-a-bad-version hold "three-part version" \
-    <<<"$(jq --argjson e "$(submission Acme.Deploy.Rules acme null 1.0)" "$insert" "$work/base.json")"
+gate reviews-a-rewrite review "removes or rewrites" <<<"$(jq --argjson e "$acme" \
+    '.plugins = [$e] + (.plugins | map(if .namespace == "math" then .version = "2.0.0" else . end))' "$work/base.json")"
 
-gate holds-a-bad-namespace hold "lowercase letters and digits" \
-    <<<"$(jq --argjson e "$(submission Acme.Deploy.Rules Acme null)" "$insert" "$work/base.json")"
-
-gate holds-nothing-added hold "adds no plugin" < "$work/base.json"
-
-gate holds-broken-json hold "not valid JSON" <<<'{ "plugins": ['
+gate reviews-a-shorthand review "shorthand character" \
+    <<<"$(jq --argjson e "$(submission Acme.Deploy.Rules acme '"!"')" "$insert" "$work/base.json")"
 
 FILES=$'ledger/submitted.json\ntool/Ledger/Program.cs' \
-    gate holds-another-file hold "changes more than the submitted list" \
+    gate reviews-another-file review "more than the submitted list" \
     <<<"$(jq --argjson e "$acme" "$insert" "$work/base.json")"
 
 FILES='ledger/reserved.json' \
-    gate holds-the-reserved-list hold "changes more than the submitted list" \
+    gate reviews-the-reserved-list review "more than the submitted list" \
     <<<"$(jq --argjson e "$acme" "$insert" "$work/base.json")"
 
+# Everything below is the submitter's own to put right, and reaches nobody else.
+gate fixes-out-of-order fix "identifier order" \
+    <<<"$(jq --argjson e "$(submission Zeta.Rules zeta null)" "$insert" "$work/base.json")"
+
+gate fixes-a-reserved-name fix "reserved namespace" \
+    <<<"$(jq --argjson e "$(submission Str.Tools str null)" "$insert" "$work/base.json")"
+
+gate fixes-a-bad-identifier fix "not a package identifier" \
+    <<<"$(jq --argjson e "$(submission 'Acme Rules; rm -rf /' acme null)" "$insert" "$work/base.json")"
+
+gate fixes-a-bad-version fix "three-part version" \
+    <<<"$(jq --argjson e "$(submission Acme.Deploy.Rules acme null 1.0)" "$insert" "$work/base.json")"
+
+gate fixes-a-bad-namespace fix "lowercase letters and digits" \
+    <<<"$(jq --argjson e "$(submission Acme.Deploy.Rules Acme null)" "$insert" "$work/base.json")"
+
+gate fixes-nothing-added fix "adds no plugin" < "$work/base.json"
+
+gate fixes-broken-json fix "not valid JSON" <<<'{ "plugins": ['
+
 BASE_REF=release \
-    gate holds-another-base hold "does not target" \
+    gate fixes-another-base fix "does not target" \
     <<<"$(jq --argjson e "$acme" "$insert" "$work/base.json")"
 
 DRAFT=true \
-    gate holds-a-draft hold "is a draft" \
+    gate fixes-a-draft fix "is a draft" \
     <<<"$(jq --argjson e "$acme" "$insert" "$work/base.json")"
+
+# A submission that is both — a shorthand character asked for on a pull request that also has
+# a version in the wrong format. The maintainer's queue wins, because the part only they can
+# answer does not stop being true when something else is wrong as well.
+gate reviews-both-at-once review "shorthand character" \
+    <<<"$(jq --argjson e "$(submission Acme.Deploy.Rules acme '"!"' 1.0)" "$insert" "$work/base.json")"
 
 echo
 echo "declared:"
@@ -182,34 +195,34 @@ submitted=$(jq -n --argjson p "[$one]" '{ plugins: $p }')
 
 declared agrees-with-its-package agrees "$submitted" "$truth"
 
-declared holds-another-manifest-id refuses "$submitted" \
+declared refuses-another-manifest-id refuses "$submitted" \
     "$(ledger "$(derived Microsoft.Rules acme null)")" \
     "was submitted, and no plugin of that name"
 
-declared holds-a-second-plugin refuses "$submitted" \
+declared refuses-a-second-plugin refuses "$submitted" \
     "$(ledger "$(derived Acme.Deploy.Rules acme null)" "$(derived Acme.Extra.Rules extra null)")" \
     "came out of the packages and was never submitted"
 
-declared holds-another-namespace refuses "$submitted" \
+declared refuses-another-namespace refuses "$submitted" \
     "$(ledger "$(derived Acme.Deploy.Rules deploy null)")" \
     "submits namespace \`acme\`, and the package claims \`deploy\`"
 
-declared holds-an-undeclared-shorthand refuses "$submitted" \
+declared refuses-an-undeclared-shorthand refuses "$submitted" \
     "$(ledger "$(derived Acme.Deploy.Rules acme '"!"')")" \
     "submits prefix \`null\`, and the package claims \`!\`"
 
-declared holds-a-drifted-version refuses "$submitted" \
+declared refuses-a-drifted-version refuses "$submitted" \
     "$(ledger "$(derived Acme.Deploy.Rules acme null 0.2.0)")" \
     "Raise the manifest version and the package version together"
 
 # Not something the tool can write — the runtime prefixes every name it registers — but the
 # job that commits the ledger runs no plugin and reads this file on trust, so the shape of a
 # thing nobody could have derived is worth refusing anyway.
-declared holds-an-operation-elsewhere refuses "$submitted" \
+declared refuses-an-operation-elsewhere refuses "$submitted" \
     "$(jq -c '.plugins[0].operations.expression = ["grid.ray"]' <<<"$truth")" \
     "which is not in its namespace"
 
-declared holds-a-reserved-namespace refuses \
+declared refuses-a-reserved-namespace refuses \
     "$(jq -n --argjson p "[$(submission Str.Tools str null)]" '{ plugins: $p }')" \
     "$(ledger "$(derived Str.Tools str null)")" \
     "reserved namespace"

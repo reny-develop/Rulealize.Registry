@@ -67,14 +67,18 @@ jobs:
 
           # Exit 2 is the gate failing rather than refusing. It leaves the pull request
           # unmerged and this job red, which is the right way round.
-          if [[ $status -gt 1 ]]; then
+          if [[ $status -eq 2 ]]; then
             echo "::error::The gate could not run."
             echo "$reasons"
             exit $status
           fi
 
-          verdict=hold
-          [[ $status -eq 0 ]] && verdict=admit
+          case $status in
+            0) verdict=admit ;;
+            1) verdict=review ;;
+            *) verdict=fix ;;
+          esac
+
           echo "verdict=${verdict}" >> "$GITHUB_OUTPUT"
           {
             echo 'reasons<<GATE_EOF'
@@ -93,28 +97,46 @@ jobs:
         run: |
           set -euo pipefail
 
-          if [[ "$VERDICT" == "admit" ]]; then
-            gh pr edit "$PR" --remove-label needs-review 2>/dev/null || true
+          # Auto-merge survives a force-push, and the label survives a fix, so both are taken
+          # away on every verdict that is not the one that put them there.
+          case "$VERDICT" in
+            admit|fix)
+              gh pr merge "$PR" --disable-auto 2>/dev/null || true
+              gh pr edit "$PR" --remove-label needs-review --remove-assignee "$OWNER" 2>/dev/null || true
+              ;;
+          esac
 
-            if [[ "$DRY_RUN" == "true" ]]; then
-              body="This submits a plugin and touches nothing else, so it would merge as soon as the checks pass. Auto-merge is not enabled yet: the gate is in dry run while it is watched."
-            else
-              gh pr merge "$PR" --auto --squash
-              body="This submits a plugin and touches nothing else, so there is nothing here for a person to decide. It merges as soon as the checks pass — the ledger is derived by loading the package you named, and that is what decides whether what you wrote is true."
-            fi
-          else
-            # Auto-merge survives a force-push, so a pull request that was admitted and has
-            # since changed has to have it taken away again.
-            gh pr merge "$PR" --disable-auto 2>/dev/null || true
-            gh label create needs-review --color FBCA04 --description "Held for a person to read" 2>/dev/null || true
-            gh pr edit "$PR" --add-label needs-review --add-assignee "$OWNER" >/dev/null
+          case "$VERDICT" in
+            admit)
+              if [[ "$DRY_RUN" == "true" ]]; then
+                body="This submits a plugin and touches nothing else, so it would merge as soon as the checks pass. Auto-merge is not enabled yet: the gate is in dry run while it is watched."
+              else
+                gh pr merge "$PR" --auto --squash
+                body="This submits a plugin and touches nothing else, so there is nothing here for a person to decide. It merges as soon as the checks pass — the ledger is derived by loading the package you named, and that is what decides whether what you wrote is true."
+              fi
+              ;;
 
-            body="@${OWNER} — this one is held for you.
+            # The submitter's own to put right. No label, no assignee, and nobody is told:
+            # they push a change and this runs again. A maintainer's queue that fills up with
+            # pull requests their own authors could fix is a queue nobody reads.
+            fix)
+              body="Not a submission yet. Push a change and this comment answers again.
+
+          ${REASONS}"
+              ;;
+
+            *)
+              gh pr merge "$PR" --disable-auto 2>/dev/null || true
+              gh label create needs-review --color FBCA04 --description "Waiting on the maintainer" 2>/dev/null || true
+              gh pr edit "$PR" --add-label needs-review --add-assignee "$OWNER" >/dev/null
+
+              body="@${OWNER} — this one is yours to answer.
 
           ${REASONS}
 
-          None of that means the submission is wrong; it means it is outside what merges without review. [The grant policy](https://github.com/reny-develop/Rulealize.Registry/blob/main/doc/policy.md) is what it is held to."
-          fi
+          None of that means it is wrong; it means it is not something a script should decide. [The grant policy](https://github.com/reny-develop/Rulealize.Registry/blob/main/doc/policy.md) is what it is held to."
+              ;;
+          esac
 
           # One comment per pull request, edited in place, so a branch pushed six times does
           # not leave six of these.
