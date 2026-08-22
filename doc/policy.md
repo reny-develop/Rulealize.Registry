@@ -5,12 +5,12 @@ submission is held to.
 
 ## Why there is a ledger at all
 
-`OperationTable.Claim` refuses a plugin whose identifier, namespace or shorthand character
-another plugin already claimed. That check is right, and it runs **at the wrong end of the
-timeline** — at the moment somebody assembles a plugin folder, which is after both plugins
-were published and after rule sets naming them went into production. The runtime cannot do
-better; it only ever sees the plugins in front of it. **No participant in the ecosystem sees
-two plugins that have never been loaded together, which is exactly the pair that collides.**
+`OperationTable.Claim` refuses a plugin whose identifier or namespace another plugin already
+claimed. That check is right, and it runs **at the wrong end of the timeline** — at the moment
+somebody assembles a plugin folder, which is after both plugins were published and after rule
+sets naming them went into production. The runtime cannot do better; it only ever sees the
+plugins in front of it. **No participant in the ecosystem sees two plugins that have never been
+loaded together, which is exactly the pair that collides.**
 
 An index is the only party that does, and moving that check earlier is the one thing here
 that cannot be retrofitted: by the time it is wanted, the colliding names are already spent.
@@ -28,10 +28,11 @@ A plugin claims three things, and they are not equally scarce.
 | --- | --- | --- |
 | identifier | unbounded | first come, vendor-qualified |
 | namespace | short, memorable, written into every operation name | first come, outside a reserved set |
-| shorthand character | **fewer than a dozen will ever exist** | first come, outside a reserved set |
+| shorthand character | fewer than a dozen exist, and they are shared | **not allocated**, outside a reserved set |
 
-The identifier is nuget.org's to allocate and this registry only records it. The other two
-are this ecosystem's alone, and no package feed models either.
+The identifier is nuget.org's to allocate and this registry only records it. The namespace is
+this ecosystem's alone, and no package feed models it. The shorthand character is recorded
+here and granted to nobody — a plugin may reserve one another plugin already reserved.
 
 ## Identifiers
 
@@ -74,28 +75,28 @@ A plugin may reserve one character. A string literal beginning with it is handed
 plugin's expander instead of being read as text, so `"@c"` is a node and not the two
 characters it looks like.
 
-**Three are spent**: `@` for Binding, `$` for State, `#` for Definition. **First come**, like a
-namespace, and for the same reason: what a character costs whoever asks second is writing the
-operation out — `def.ref("x")` rather than `"#x"` — and nothing else. Nobody is kept from
-shipping anything.
+**Three are in use**: `@` for Binding, `$` for State, `#` for Definition. **None of them is
+taken.** A character is not granted to one plugin here, and reserving one another plugin
+already reserved is admitted without comment — the two load together, and a rule set that
+would otherwise be ambiguous says which vocabulary it meant by naming it: `"$state:board"`.
 
-The supply is smaller, though, and one kind of character cannot be handed out at all.
+That is the whole of why this is not decided first come. Under a dozen characters exist for
+the entire future of the ecosystem, and a name that cannot be recovered is worth governing
+only while losing it costs something. It does not: whoever reserves `$` second reaches their
+own shorthand by writing their namespace in front of it, in the documents where it matters
+and nowhere else.
 
-**Reserved.** A character that ordinary data might *begin* with would silently swallow it, and
-a character carrying meaning *inside* a value would swallow somebody else's text form — `|`
-separates a tuple's components, and a plugin holding `|` would take over every tuple whose
-first component is empty. Those are in
-[`ledger/reserved.json`](../ledger/reserved.json) and are refused, not granted.
+**Reserved.** One kind of character cannot be used at all, by anybody. A character that
+ordinary data might *begin* with would silently swallow it, and a character carrying meaning
+*inside* a value would swallow somebody else's text form — `|` separates a tuple's components,
+and a plugin using `|` would take over every tuple whose first component is empty. Those are
+in [`ledger/reserved.json`](../ledger/reserved.json) and are refused. That list is about what
+the mechanism cannot survive, not about who asked first, so it stays exactly as it was.
 
 The runtime refuses the rest of that class on its own: `PluginManifest` will not accept a
 letter, a digit or whitespace as a shorthand character, whatever this registry thinks.
 
-**What is left is under a dozen characters for the entire future of the ecosystem**, and they
-go to whoever publishes first. That is a real cost to whoever is second, and it is the same
-cost as losing a namespace — which is why it is decided the same way, by a list of what may
-not be taken rather than by somebody's opinion of who deserves one.
-
-Two things are worth knowing before spending one, and neither is a condition.
+Two things are worth knowing before reserving one, and neither is a condition.
 
 - **The expansion wants to be a reference to something named** — a binding, a state field, a
   definition. All three that exist are, and that is not a coincidence: an operation with
@@ -123,6 +124,9 @@ thing here that no package backs, and it is the opposite of a claim: it grants n
 anybody and exists only to refuse.
 
 ## A claim is permanent
+
+This is about the namespace. A shorthand character is not owned in the first place, so there
+is nothing about one to release or to keep.
 
 A namespace is not released when a plugin is abandoned, unlisted, or deleted from nuget.org.
 
@@ -174,9 +178,11 @@ rather than your project file's. CI asks nuget.org for the package at exactly th
 a manifest and a package version that have drifted apart are refused here. Raise the two
 together.
 
-`prefix` is `null` unless your plugin claims a [shorthand character](#shorthand-characters),
-and it is written rather than left out: "claimed no shorthand character" is a claim, and one
-worth being able to see was made.
+`prefix` is `null` unless your plugin reserves a [shorthand character](#shorthand-characters),
+and it is written rather than left out: "reserves no shorthand character" is a claim, and one
+worth being able to see was made. It is recorded rather than granted — another entry may
+already carry the same character, and that is not something this registry has an opinion
+about.
 
 **Nothing you state is believed.** CI fetches the package, loads it, and refuses the pull
 request if the assembly says anything other than what the line says — a different namespace, a
@@ -212,6 +218,6 @@ nothing else this way, and an [issue](https://github.com/reny-develop/Rulealize.
 is where anything about the tools, the site or this document belongs.
 
 Nothing else is on either list. A namespace that is not your vendor's —
-`Acme.Deploy.Rules` claiming `deploy` — merges. So does a shorthand character outside the
-reserved set. Both cost whoever asks second some verbosity and nothing more, and neither is
-worth a queue.
+`Acme.Deploy.Rules` claiming `deploy` — merges. So does a shorthand character somebody else
+already reserved, which is not even a collision: it costs the rule sets that write it a
+namespace in front, and nothing else.

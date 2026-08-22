@@ -1,8 +1,8 @@
 # Rulealize.Registry
 
 The index of the [Rulealize](https://github.com/reny-develop/Rulealize) plugin ecosystem:
-which plugin provides an operation, which versions satisfy a rule set's `requires`, and which
-namespaces and shorthand characters are already spoken for.
+which plugin provides an operation, which versions satisfy a rule set's `requires`, which
+namespaces are already spoken for, and which shorthand characters are in use by whom.
 
 > **Status — early.** What exists is the claim ledger, the tools that check it and build the
 > catalogue from it, the jobs that hold a pull request to both, and the site — which is
@@ -12,8 +12,9 @@ namespaces and shorthand characters are already spoken for.
 ## The ledger
 
 [`ledger/submitted.json`](ledger/submitted.json) records what each plugin claims — its
-identifier, its namespace and its shorthand character. **Each of those has exactly one owner
-across the whole ecosystem**, and three of them are already spent:
+identifier, its namespace and its shorthand character. **The first two have exactly one owner
+across the whole ecosystem.** The third has none: a character is recorded here and granted to
+nobody, and three are in use so far:
 
 | | Plugin | Namespace |
 | --- | --- | --- |
@@ -97,11 +98,10 @@ would ship on this repository's schedule and would eventually be wrong.
 A package feed distributes plugins perfectly well, and this repository does not try to
 replace it. What a feed cannot model is the part that makes a Rulealize plugin a plugin.
 
-**A plugin claims an identifier, a namespace and — at most — one shorthand character, and
-each of those has exactly one owner across the whole ecosystem.** The runtime refuses a
-collision when the plugins are loaded together, which is after both were published and after
-rule sets naming them are in production. Nobody in the ecosystem sees two plugins that have
-never been loaded together, and that is exactly the pair that collides.
+**A plugin claims a namespace, and it has exactly one owner across the whole ecosystem.** The
+runtime refuses a collision when the plugins are loaded together, which is after both were
+published and after rule sets naming them are in production. Nobody in the ecosystem sees two
+plugins that have never been loaded together, and that is exactly the pair that collides.
 
 An index is the only party that does. That ledger is this repository's first job and the
 only part of it that cannot be added later.
