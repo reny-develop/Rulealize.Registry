@@ -1,0 +1,24 @@
+# The admission gate's own cases.
+#
+# admit.yml runs with a token that can merge, from a script on main that nothing in a pull
+# request can reach. What a pull request can reach is this file and the cases themselves, so
+# they are run here as an ordinary check: a change that weakens a rule has to show up as a
+# case that no longer passes.
+
+name: gate
+
+on:
+  pull_request:
+  push:
+    branches: [ main ]
+  workflow_dispatch:
+
+jobs:
+  cases:
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Run the cases
+        run: bash .github/admit/test/run.sh

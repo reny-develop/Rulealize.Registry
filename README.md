@@ -37,9 +37,17 @@ the same assemblies produces no diff — there is no timestamp in the file and e
 is sorted — so a change in the ledger is always a change in what somebody claimed.
 
 [`.github/workflows/ledger.yml`](.github/workflows/ledger.yml) does exactly that on every
-pull request touching the ledger: it fetches the packages the file names, re-derives it, and
-fails on any difference. A pull request may claim a namespace and an operation list; that job
-is what decides whether the claim is true.
+pull request: it fetches the packages the file names, re-derives it, and fails on any
+difference. A pull request may claim a namespace and an operation list; that job is what
+decides whether the claim is true.
+
+Which is why **a submission that adds a row and touches nothing else merges without anybody
+reading it**. [`admit.yml`](.github/workflows/admit.yml) checks that it is that and no more —
+the rules are in [`.github/admit/gate.sh`](.github/admit/gate.sh), one case each in
+[`.github/admit/test/`](.github/admit/test/) — and then waits for the checks. A shorthand
+character, a reserved namespace, a row that was already there, or a namespace that is not the
+plugin's vendor segment is held instead, labelled, and left for a person.
+[The grant policy](doc/policy.md#what-happens-to-your-pull-request) says which is which.
 
 ## The catalogue
 

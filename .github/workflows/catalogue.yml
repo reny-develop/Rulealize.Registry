@@ -13,11 +13,9 @@
 name: catalogue
 
 on:
+  # No paths filter. This is a required check, and a required check a pull request
+  # can skip by touching other files is one that blocks that pull request for ever.
   pull_request:
-    paths:
-      - 'ledger/**'
-      - 'tool/**'
-      - '.github/workflows/catalogue.yml'
   push:
     branches: [ main ]
   schedule:
@@ -34,6 +32,12 @@ jobs:
       - uses: actions/setup-dotnet@v4
         with:
           dotnet-version: '10.0.x'
+
+      # Ahead of the crawl, because this takes seconds and the crawl takes minutes. Every
+      # string on a page came out of somebody else's package, and these are the two that would
+      # do something other than sit there. The cases are in tool/Site/test/.
+      - name: Check the site against a hostile catalogue
+        run: bash tool/Site/test/run.sh
 
       # The catalogue loads no plugin — one process cannot hold two versions of the same
       # assembly — and runs this once per version instead.

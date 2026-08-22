@@ -66,6 +66,26 @@ if (runtime.Plugins.IsEmpty)
     return 1;
 }
 
+// The runtime prefixes a registered name with the plugin's namespace and does not police the
+// rest of it, so an operation can be called anything its author typed. Downstream of this
+// file it becomes a file name and a URL — site/op/<name>.html — and a name that is a path
+// would write outside the folder it was meant for. Refusing it here keeps it out of the
+// ledger, which keeps it out of the catalogue and out of every path built from either.
+string[] malformed =
+[
+    .. runtime.Operations
+        .Select(static operation => operation.Op)
+        .Where(static op => !IsOperationName(op))
+        .Distinct(StringComparer.Ordinal)
+        .Order(StringComparer.Ordinal),
+];
+
+if (malformed.Length is not 0)
+{
+    Console.Error.WriteLine($"These are not operation names: {string.Join(", ", malformed)}");
+    return 1;
+}
+
 string json = Write(runtime);
 
 if (args.Length is 2)
@@ -80,6 +100,41 @@ else
 }
 
 return 0;
+
+// A namespace, a dot, and a member that starts lowercase and carries only letters and digits:
+// grid.ray, seq.elementAt. Every operation in the standard distribution is one, and the
+// runtime requires only the namespace it prefixes.
+static bool IsOperationName(string op)
+{
+    int dot = op.IndexOf('.');
+    if (dot < 1 || dot == op.Length - 1)
+    {
+        return false;
+    }
+
+    if (!char.IsAsciiLetterLower(op[0]) || !char.IsAsciiLetterLower(op[dot + 1]))
+    {
+        return false;
+    }
+
+    for (int i = 1; i < dot; i++)
+    {
+        if (!char.IsAsciiLetterLower(op[i]) && !char.IsAsciiDigit(op[i]))
+        {
+            return false;
+        }
+    }
+
+    for (int i = dot + 2; i < op.Length; i++)
+    {
+        if (!char.IsAsciiLetterOrDigit(op[i]))
+        {
+            return false;
+        }
+    }
+
+    return true;
+}
 
 static string Write(RuleRuntime runtime)
 {

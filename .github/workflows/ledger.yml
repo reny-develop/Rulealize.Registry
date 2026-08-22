@@ -14,11 +14,9 @@
 name: ledger
 
 on:
+  # No paths filter. This is a required check, and a required check a pull request
+  # can skip by touching other files is one that blocks that pull request for ever.
   pull_request:
-    paths:
-      - 'ledger/**'
-      - 'tool/Ledger/**'
-      - '.github/workflows/ledger.yml'
   push:
     branches: [ main ]
   workflow_dispatch:
@@ -59,5 +57,21 @@ jobs:
         run: |
           if ! diff -u ledger/claim.json work/claim.json; then
             echo "::error file=ledger/claim.json::The ledger does not match what the packages claim. The lines marked + are what they actually claim."
+            exit 1
+          fi
+
+      # The reserved list is the one hand-written thing in this repository and the opposite of
+      # a claim: it grants nothing to anybody and exists only to refuse. It is checked against
+      # the whole ledger rather than against the submission, so a name added to the list later
+      # is found the next time this runs rather than only by whoever reviews the next entry.
+      - name: Check the reserved namespaces
+        run: |
+          set -euo pipefail
+          claimed=$(jq -r --slurpfile reserved ledger/reserved.json \
+            '.plugins[] | select(.namespace as $n | $reserved[0].namespaces | index($n)) | "\(.id) claims the reserved namespace \(.namespace)"' \
+            ledger/claim.json)
+          if [[ -n "$claimed" ]]; then
+            echo "::error file=ledger/claim.json::A reserved namespace was claimed."
+            echo "$claimed"
             exit 1
           fi
