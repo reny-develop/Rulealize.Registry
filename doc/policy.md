@@ -148,10 +148,50 @@ for one claim and one meaning: CI reproduced this package from its tagged source
 
 ## How to claim
 
-Open a pull request adding the plugin to [`ledger/claim.json`](../ledger/claim.json) — the
-identifier, the version, the namespace, the prefix, and the operations. CI fetches that
-package, re-derives the entry and fails on any difference, so the only part you can get wrong
-is which package you named.
+Open a pull request adding the plugin to [`ledger/claim.json`](../ledger/claim.json). CI
+fetches that package, re-derives the entry and fails on any difference, so the only part you
+can get wrong is which package you named.
+
+**Derive your entry rather than write it.** The tool that produced that file produces your row
+too: point it at a folder holding your plugin and, given no output file, it prints what your
+assembly claims.
+
+```sh
+dotnet run --project tool/Ledger -- <your plugin folder>
+```
+
+It prints one object per plugin the folder holds, so a `plugin/` folder that `restore` has
+filled prints the standard vocabularies beside yours. Take yours, and put it in the `plugins`
+array in identifier order.
+
+```json
+{
+  "id": "Acme.Deploy.Rules",
+  "admitted": "0.1.0",
+  "namespace": "acme",
+  "prefix": null,
+  "operations": {
+    "expression": [
+      "acme.frozen"
+    ],
+    "effect": [],
+    "schema": []
+  }
+}
+```
+
+`admitted` is the version those claims were read from, which is the version CI goes and
+fetches. All three kinds of operation are written even where you register none of one, and a
+plugin claiming no shorthand character writes `null` rather than leaving the field out —
+"claimed no shorthand character" is a claim, and one worth being able to see was made.
+
+The comparison is `diff -u` against a regenerated file, so the ordering and the layout above
+are part of what has to match. Pasting what the tool printed is why none of that is something
+you have to know.
+
+Nothing else is submitted. The description, repository, licence and the version of
+`Rulealize.Abstraction` it was built against are read from the package; there is no field
+here for anything you would otherwise have to keep in step with a release.
 
 A claim that collides shows up as a conflict with an existing entry, and is refused there
 rather than in somebody's application six months later. That is the whole of the exercise.
