@@ -28,7 +28,7 @@ A plugin claims three things, and they are not equally scarce.
 | --- | --- | --- |
 | identifier | unbounded | first come, vendor-qualified |
 | namespace | short, memorable, written into every operation name | first come, outside a reserved set |
-| shorthand character | **fewer than a dozen will ever exist** | **by review. The default answer is no** |
+| shorthand character | **fewer than a dozen will ever exist** | first come, outside a reserved set |
 
 The identifier is nuget.org's to allocate and this registry only records it. The other two
 are this ecosystem's alone, and no package feed models either.
@@ -74,27 +74,34 @@ A plugin may reserve one character. A string literal beginning with it is handed
 plugin's expander instead of being read as text, so `"@c"` is a node and not the two
 characters it looks like.
 
-**Three are spent**: `@` for Binding, `$` for State, `#` for Definition. What is left is one
-keystroke wide, cannot be extended, and shrinks further on inspection — a character ordinary
-data might begin with would silently swallow it, so letters, digits, `-` and `.` are out, and
-a character carrying meaning *inside* a value, like the separator in a tuple's text form,
-should not also begin one. **What remains is under a dozen characters for the entire future
-of the ecosystem.**
+**Three are spent**: `@` for Binding, `$` for State, `#` for Definition. **First come**, like a
+namespace, and for the same reason: what a character costs whoever asks second is writing the
+operation out — `def.ref("x")` rather than `"#x"` — and nothing else. Nobody is kept from
+shipping anything.
 
-So the default answer is no, and a grant has to clear all four of these.
+The supply is smaller, though, and one kind of character cannot be handed out at all.
 
-1. **The vocabulary is in the standard distribution, or is demonstrably in broad use.** A
-   vocabulary with an audience of one should not spend one
-2. **The expansion is a reference to something named** — a binding, a state field, a
-   definition — rather than an operation taking arguments. All three that exist are
-   references, and that is not a coincidence: an operation with arguments has nowhere to put
-   them inside a string literal
-3. **It appears often enough that writing it out obscures the rule.** The test is a real rule
-   set with the shorthand expanded. If it still reads, the shorthand was a preference
-4. **The character is one no ordinary value would begin with**
+**Reserved.** A character that ordinary data might *begin* with would silently swallow it, and
+a character carrying meaning *inside* a value would swallow somebody else's text form — `|`
+separates a tuple's components, and a plugin holding `|` would take over every tuple whose
+first component is empty. Those are in
+[`ledger/reserved.json`](../ledger/reserved.json) and are refused, not granted.
 
-A refusal costs one plugin some verbosity. A grant costs every future plugin one of the last
-characters, which is why the burden falls the way it does.
+The runtime refuses the rest of that class on its own: `PluginManifest` will not accept a
+letter, a digit or whitespace as a shorthand character, whatever this registry thinks.
+
+**What is left is under a dozen characters for the entire future of the ecosystem**, and they
+go to whoever publishes first. That is a real cost to whoever is second, and it is the same
+cost as losing a namespace — which is why it is decided the same way, by a list of what may
+not be taken rather than by somebody's opinion of who deserves one.
+
+Two things are worth knowing before spending one, and neither is a condition.
+
+- **The expansion wants to be a reference to something named** — a binding, a state field, a
+  definition. All three that exist are, and that is not a coincidence: an operation with
+  arguments has nowhere to put them inside a string literal
+- **It wants to appear often enough that writing it out obscures the rule.** The test is a
+  real rule set with the shorthand expanded. If it still reads, the shorthand was a preference
 
 ## No claim before a package
 
@@ -111,8 +118,9 @@ answer is to publish `0.1.0` on the day the namespace is chosen. That is cheap, 
 every package feed already expects, and it makes the claim in the only way this registry is
 able to record one.
 
-[The reserved list](../ledger/reserved.json) is the one thing here that no package backs, and
-it is the opposite of a claim: it grants nothing to anybody and exists only to refuse.
+[The reserved list](../ledger/reserved.json) — namespaces and characters both — is the one
+thing here that no package backs, and it is the opposite of a claim: it grants nothing to
+anybody and exists only to refuse.
 
 ## A claim is permanent
 
@@ -166,7 +174,7 @@ rather than your project file's. CI asks nuget.org for the package at exactly th
 a manifest and a package version that have drifted apart are refused here. Raise the two
 together.
 
-`prefix` is `null` unless you are asking for a [shorthand character](#shorthand-characters),
+`prefix` is `null` unless your plugin claims a [shorthand character](#shorthand-characters),
 and it is written rather than left out: "claimed no shorthand character" is a claim, and one
 worth being able to see was made.
 
@@ -191,26 +199,19 @@ word of the line is held to what the assembly says, and a claim that collides wi
 made cannot be loaded beside it. Whether the claim is true is not an opinion anybody here
 holds.
 
-What stops one falls into two kinds, and only the second involves anybody else.
+What stops one is always one of two things, and **neither of them waits on anybody**.
 
 **Yours to put right.** A version that is not three parts, an entry out of order, a namespace
-that is not lowercase, a [reserved](../ledger/reserved.json) name, a draft. The reason is
-written on the pull request, you push a change, and it is answered again. Nobody is told, and
-nobody could have helped.
+that is not lowercase, a [reserved](../ledger/reserved.json) name or character, a line
+somebody else's claim was on, a draft. The reason is written on the pull request, you push a
+change, and it is answered again. Nobody else is told, because nobody else could have helped.
 
-**The maintainer's to answer.** Three things, and none of them is a judgement about your
-plugin.
+**Not a submission.** A pull request that changes anything besides `ledger/submitted.json` is
+closed. That is not a judgement about the change — this repository indexes plugins and takes
+nothing else this way, and an [issue](https://github.com/reny-develop/Rulealize.Registry/issues)
+is where anything about the tools, the site or this document belongs.
 
-1. It claims a [shorthand character](#shorthand-characters) — there are fewer than a dozen
-   left, so this one is read rather than counted
-2. It removes or rewrites a line that was already there. [A claim is permanent](#a-claim-is-permanent),
-   so that is either a mistake or something worse
-3. It changes something besides `ledger/submitted.json` — which may be a perfectly good change
-   to the tools, and is simply not a submission
-
-Those are labelled, assigned, and left where they cannot be quietly forgotten. Held is not
-refused.
-
-A namespace that is not your vendor's — `Acme.Deploy.Rules` claiming `deploy` — is **not** on
-either list. It is first come like any other, and what it costs whoever asks second is some
-verbosity in their operation names and nothing else.
+Nothing else is on either list. A namespace that is not your vendor's —
+`Acme.Deploy.Rules` claiming `deploy` — merges. So does a shorthand character outside the
+reserved set. Both cost whoever asks second some verbosity and nothing more, and neither is
+worth a queue.

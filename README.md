@@ -48,10 +48,10 @@ Which is why **a submission that adds one line and touches nothing else merges w
 reading it**. [`admit.yml`](.github/workflows/admit.yml) checks that it is that and no more —
 the rules are in [`.github/admit/gate.sh`](.github/admit/gate.sh), one case each in
 [`.github/admit/test/`](.github/admit/test/) — and then waits for the checks. What it will not
-admit splits in two: most of it the submitter can put right by pushing again, and is written
-on their pull request and told to nobody else. Three things are the maintainer's — a shorthand
-character, a line somebody else's claim was on, and a pull request that is not a submission at
-all — and those are labelled, assigned and chased.
+admit waits on nobody either: a submission with something wrong in it says so on the pull
+request and is the submitter's to push again, and a pull request that is not a submission is
+closed, because **this repository indexes plugins and takes nothing else that way** — anything
+about the tools or the site belongs in an issue.
 [The grant policy](doc/policy.md#what-happens-to-your-pull-request) says which is which.
 
 ## The catalogue

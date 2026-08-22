@@ -96,14 +96,20 @@ done < <(jq -r '.plugins[] as $plugin
     | select(startswith("\($plugin.namespace).") | not)
     | "`\($plugin.id)` lists the operation `\(.)`, which is not in its namespace."' "$derived")
 
-# Reserved namespaces are refused against what the packages claim rather than only against
-# what was written down, so a name cannot be taken by declaring something else.
+# Reserved names are refused against what the packages claim rather than only against what was
+# written down, so neither a namespace nor a shorthand character can be taken by declaring
+# something else and being believed.
 while IFS= read -r line; do
     [[ -z "$line" ]] && continue
     note "$line"
-done < <(jq -r --slurpfile reserved "$reserved" \
-    '.plugins[] | select(.namespace as $n | $reserved[0].namespaces | index($n))
-     | "`\(.id)` claims the reserved namespace `\(.namespace)`."' "$derived")
+done < <(jq -r --slurpfile reserved "$reserved" '
+    .plugins[]
+    | . as $plugin
+    | [ (select($plugin.namespace as $n | $reserved[0].namespaces | index($n))
+          | "`\($plugin.id)` claims the reserved namespace `\($plugin.namespace)`."),
+        (select($plugin.prefix != null and ($plugin.prefix as $p | $reserved[0].prefixes | index($p)))
+          | "`\($plugin.id)` claims the reserved shorthand character `\($plugin.prefix)`.") ]
+    | .[]' "$derived")
 
 if [[ ${#wrong[@]} -gt 0 ]]; then
     printf '%s\n' "${wrong[@]}"

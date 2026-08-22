@@ -5,7 +5,13 @@
 # which fetches the package and loads it. This decides a different question: whether the
 # change is the shape a submission has. A pull request that adds one line to the submitted
 # list and touches nothing else has no judgement left in it, so it merges when the checks
-# pass. Anything else is held, labelled and assigned, and the reason is written on it.
+# pass.
+#
+# What is left over never waits on anybody. A submission with something wrong in it says so on
+# the pull request and is the submitter's to push again; a pull request that is not a
+# submission is closed, because this repository indexes plugins and takes nothing else that
+# way. Nothing is labelled, nobody is assigned, and no notification is owed to a maintainer
+# who has nothing to decide.
 #
 # pull_request_target runs this file as it is on main, with a token that can merge — so the
 # gate reads the pull request as data and never runs a line of it. The only thing that comes
@@ -75,7 +81,7 @@ jobs:
 
           case $status in
             0) verdict=admit ;;
-            1) verdict=review ;;
+            1) verdict=close ;;
             *) verdict=fix ;;
           esac
 
@@ -93,18 +99,16 @@ jobs:
           VERDICT: ${{ steps.gate.outputs.verdict }}
           REASONS: ${{ steps.gate.outputs.reasons }}
           OWNER: ${{ github.repository_owner }}
+          AUTHOR: ${{ github.event.pull_request.user.login }}
           DRY_RUN: ${{ vars.ADMIT_DRY_RUN }}
         run: |
           set -euo pipefail
 
-          # Auto-merge survives a force-push, and the label survives a fix, so both are taken
-          # away on every verdict that is not the one that put them there.
-          case "$VERDICT" in
-            admit|fix)
-              gh pr merge "$PR" --disable-auto 2>/dev/null || true
-              gh pr edit "$PR" --remove-label needs-review --remove-assignee "$OWNER" 2>/dev/null || true
-              ;;
-          esac
+          # Auto-merge survives a force-push, so a pull request that was admitted and has
+          # since changed has to have it taken away again.
+          if [[ "$VERDICT" != "admit" ]]; then
+            gh pr merge "$PR" --disable-auto 2>/dev/null || true
+          fi
 
           case "$VERDICT" in
             admit)
@@ -116,25 +120,27 @@ jobs:
               fi
               ;;
 
-            # The submitter's own to put right. No label, no assignee, and nobody is told:
-            # they push a change and this runs again. A maintainer's queue that fills up with
-            # pull requests their own authors could fix is a queue nobody reads.
+            # The submitter's own to put right. Nobody else is told: they push a change and
+            # this runs again.
             fix)
               body="Not a submission yet. Push a change and this comment answers again.
 
           ${REASONS}"
               ;;
 
-            *)
-              gh pr merge "$PR" --disable-auto 2>/dev/null || true
-              gh label create needs-review --color FBCA04 --description "Waiting on the maintainer" 2>/dev/null || true
-              gh pr edit "$PR" --add-label needs-review --add-assignee "$OWNER" >/dev/null
+            # Not a submission at all. This repository indexes plugins and takes nothing else
+            # through a pull request, so it is closed rather than left open for somebody who
+            # is never coming — the exception being the owner, whose changes to the tools
+            # arrive this way on purpose.
+            close)
+              body="This repository takes submissions to [\`ledger/submitted.json\`](https://github.com/${GITHUB_REPOSITORY}/blob/main/ledger/submitted.json) and nothing else through a pull request. Anything about the tools, the site or the policy belongs in an [issue](https://github.com/${GITHUB_REPOSITORY}/issues).
 
-              body="@${OWNER} — this one is yours to answer.
+          ${REASONS}"
 
-          ${REASONS}
-
-          None of that means it is wrong; it means it is not something a script should decide. [The grant policy](https://github.com/reny-develop/Rulealize.Registry/blob/main/doc/policy.md) is what it is held to."
+              if [[ "$AUTHOR" != "$OWNER" ]]; then
+                body="${body}
+          Closing this one — nothing is lost, and an issue is the place for it."
+              fi
               ;;
           esac
 
@@ -153,4 +159,9 @@ jobs:
             gh api -X PATCH "repos/${GITHUB_REPOSITORY}/issues/comments/${existing}" -f body="$body" >/dev/null
           else
             gh api -X POST "repos/${GITHUB_REPOSITORY}/issues/${PR}/comments" -f body="$body" >/dev/null
+          fi
+
+          # After the comment, so that the reason is on the pull request before it shuts.
+          if [[ "$VERDICT" == "close" && "$AUTHOR" != "$OWNER" ]]; then
+            gh pr close "$PR"
           fi
