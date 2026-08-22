@@ -4,16 +4,16 @@ The index of the [Rulealize](https://github.com/reny-develop/Rulealize) plugin e
 which plugin provides an operation, which versions satisfy a rule set's `requires`, and which
 namespaces and shorthand characters are already spoken for.
 
-> **Status — early.** What exists is the claim ledger, the tools that derive it and the
-> catalogue from it, the jobs that hold a pull request to them, and the site — which is
+> **Status — early.** What exists is the claim ledger, the tools that check it and build the
+> catalogue from it, the jobs that hold a pull request to both, and the site — which is
 > [up](https://reny-develop.github.io/Rulealize.Registry/), labelled pre-release. Nothing
 > beyond the standard distribution is indexed yet.
 
 ## The ledger
 
-[`ledger/claim.json`](ledger/claim.json) records what each plugin claims — its identifier,
-its namespace, its shorthand character, and every operation it registers. **Each of those has
-exactly one owner across the whole ecosystem**, and three of them are already spent:
+[`ledger/submitted.json`](ledger/submitted.json) records what each plugin claims — its
+identifier, its namespace and its shorthand character. **Each of those has exactly one owner
+across the whole ecosystem**, and three of them are already spent:
 
 | | Plugin | Namespace |
 | --- | --- | --- |
@@ -24,28 +24,31 @@ exactly one owner across the whole ecosystem**, and three of them are already sp
 The namespaces taken are `bind`, `branch`, `cmp`, `def`, `graph`, `grid`, `logic`, `math`,
 `rec`, `seq`, `state`, `tuple` and `type`.
 
-Nothing in that file is written by hand. [`tool/Ledger`](tool/Ledger/) points a `RuleRuntime`
-at a folder of assemblies and writes down what came back, which is the same folder scan a
-deployed application performs:
+An entry is one line and four fields — the package, the version its claims were read at, the
+namespace and the shorthand character. **The operations are not in it.** Nobody submits a list
+of what their plugin registers, so nobody keeps one in step with a release and nobody can get
+one wrong; they are read out of the assembly by [`tool/Ledger`](tool/Ledger/), which points a
+`RuleRuntime` at a folder and writes down what came back — the same folder scan a deployed
+application performs. Run it against your own plugin and it prints what it found:
 
 ```sh
-dotnet run --project tool/Ledger -- <plugin folder> ledger/claim.json
+dotnet run --project tool/Ledger -- <plugin folder>
 ```
 
-It knows no plugin by name and has no list of the standard twelve. Regenerating it against
-the same assemblies produces no diff — there is no timestamp in the file and everything in it
-is sorted — so a change in the ledger is always a change in what somebody claimed.
+It knows no plugin by name and has no list of the standard twelve.
 
-[`.github/workflows/ledger.yml`](.github/workflows/ledger.yml) does exactly that on every
-pull request: it fetches the packages the file names, re-derives it, and fails on any
-difference. A pull request may claim a namespace and an operation list; that job is what
-decides whether the claim is true.
+**Nor is the rest of an entry believed.**
+[`.github/workflows/ledger.yml`](.github/workflows/ledger.yml) fetches every package the
+ledger names, loads it, and refuses anything that says one thing where its assembly says
+another — a namespace, a shorthand character, a version, or a package published under a name
+its manifest does not declare. A pull request may state a claim; that job is what decides
+whether it is true.
 
-Which is why **a submission that adds a row and touches nothing else merges without anybody
+Which is why **a submission that adds one line and touches nothing else merges without anybody
 reading it**. [`admit.yml`](.github/workflows/admit.yml) checks that it is that and no more —
 the rules are in [`.github/admit/gate.sh`](.github/admit/gate.sh), one case each in
 [`.github/admit/test/`](.github/admit/test/) — and then waits for the checks. A shorthand
-character, a reserved namespace, a row that was already there, or a namespace that is not the
+character, a reserved namespace, a line that was already there, or a namespace that is not the
 plugin's vendor segment is held instead, labelled, and left for a person.
 [The grant policy](doc/policy.md#what-happens-to-your-pull-request) says which is which.
 
@@ -57,7 +60,7 @@ in this repository.
 
 ```sh
 dotnet publish tool/Ledger -c Release -o work/probe
-dotnet run --project tool/Catalogue -- ledger/claim.json work/probe/Rulealize.Registry.Ledger.dll site
+dotnet run --project tool/Catalogue -- ledger/submitted.json work/probe/Rulealize.Registry.Ledger.dll site
 ```
 
 | | |
@@ -65,7 +68,7 @@ dotnet run --project tool/Catalogue -- ledger/claim.json work/probe/Rulealize.Re
 | `site/index.json` | every plugin and operation in summary — 10 KB for the standard distribution, which is what makes search a client-side matter |
 | `site/plugin/<id>.json` | one plugin, every released version, every operation of each |
 
-The ledger holds one row per plugin because [a claim is permanent](doc/policy.md#a-claim-is-permanent);
+The ledger holds one line per plugin because [a claim is permanent](doc/policy.md#a-claim-is-permanent);
 the catalogue holds one entry per version because a rule set's `requires` reads `^1.0` and
 operations may be added within a major. **So a new version of a plugin already admitted needs
 no pull request** — nothing committed changes, and the next scheduled run picks it up.
@@ -75,9 +78,10 @@ releases. [`catalogue.yml`](.github/workflows/catalogue.yml) checks every versio
 against the ledger and writes nothing at all if one disagrees, so the rule is enforced daily
 while the file a person reads does not move.
 
-Nothing hand-written goes into a plugin entry. The description, repository, licence and
+Nothing hand-written goes into a catalogue entry. The description, repository, licence and
 abstraction version are in the `.nuspec`; the claims and operations are in the assembly. A
-submission is a package identifier.
+submission is a package identifier, the version to read it at, and the two names it claims —
+and every one of those four is checked against the package before it counts.
 
 The abstraction version is worth recording because it is a whole class of failure a user
 otherwise meets as a `ReflectionTypeLoadException`, which the runtime can only report as
@@ -128,8 +132,8 @@ mattered.
 
 | | |
 | --- | --- |
-| **plugin** | submitted as a package identifier. Everything recorded is derived by loading it |
-| **operation** | `grid.ray`, `rec.keys` — derived from the above, never submitted |
+| **plugin** | submitted as a package identifier, a version, and the two names it claims. Nothing stated is believed until the package says the same |
+| **operation** | `grid.ray`, `rec.keys` — read out of the assembly, never submitted |
 
 **Rule sets are not indexed here**, though for most of this repository's design they were
 going to be. Three findings took the case apart. There is **no scarce name to govern**, so

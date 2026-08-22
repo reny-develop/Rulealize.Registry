@@ -47,7 +47,7 @@ jobs:
       - name: Build the catalogue
         run: >
           dotnet run --project tool/Catalogue --
-          ledger/claim.json work/probe/Rulealize.Registry.Ledger.dll catalogue
+          ledger/submitted.json work/probe/Rulealize.Registry.Ledger.dll catalogue
 
       # Built on every run, including the ones that will not publish: a pull request, or any
       # ref that is not main. Holding the deploy step was the whole of what "the site is not

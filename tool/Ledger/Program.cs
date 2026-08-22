@@ -16,13 +16,14 @@ using Rulealize.Abstraction.Plugin;
 // the DLLs — so there is no way for the ledger to describe a plugin differently from the way
 // an application loading that same folder would see it.
 //
-// Two things make the output reviewable as a diff, which is the only form a claim ledger is
-// ever read in:
+// Nothing it writes is committed anywhere. What it produces is compared — against the ledger
+// somebody wrote, by declared.sh, and against the previous version of the same plugin, by
+// Catalogue — so two things matter about the output:
 //
 //   - everything is sorted, so the order a folder scan happened to produce cannot show up as
-//     a change
-//   - there is no timestamp, and no version of this tool, in the file. A regeneration that
-//     found nothing new produces no diff at all
+//     a difference
+//   - there is no timestamp, and no version of this tool, in the file. The same assemblies
+//     produce the same bytes, on any run and on any machine
 //
 // The absence of a prefix is written as null rather than omitted, and all three kinds of
 // operation are written even when a plugin registers none of one. A ledger records claims,
@@ -32,11 +33,10 @@ using Rulealize.Abstraction.Plugin;
 // new operation to a single line of diff. It also gives the one name registered as two kinds
 // somewhere to appear twice, which a map from name to kind could not.
 //
-// "admitted" is the version these claims were read from. This tool only ever reports which
-// version it found in the folder; the name is for the file it produces when that file is
-// committed, where the pinned version is the one the plugin was admitted at and every later
-// release is checked against it rather than re-reviewed. Catalogue runs this same tool once
-// per version, and there the field means nothing more than what was loaded.
+// "admitted" is the version these claims were read from — the manifest's, which is why a
+// manifest and a package that have drifted apart are caught by comparing this against the
+// version the ledger says the package was fetched at. Catalogue runs this same tool once per
+// release, and there the field means nothing more than what was loaded.
 
 if (args.Length is 0 or > 2)
 {
