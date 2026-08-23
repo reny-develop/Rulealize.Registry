@@ -66,7 +66,7 @@ supply of others.
 
 **Vendor-qualify a private vocabulary.** `acme`, not `deploy`. A namespace with an audience
 of one still occupies a name in a space everyone shares, which is why
-[Rulealize's conventions](https://github.com/reny-develop/Rulealize/blob/main/doc/plugin.md#the-conventions)
+[Rulealize's conventions](https://github.com/reny-develop/Rulealize/blob/main/doc/plugin.md#the-identifier-and-the-namespace-are-still-claimed)
 already say so for vocabularies that will never be submitted here.
 
 ## Shorthand characters
