@@ -14,6 +14,7 @@
     { "id": "Rulealize.Plugin.Sequence", "version": "1.2.0", "namespace": "seq", "prefix": null },
     { "id": "Rulealize.Plugin.State", "version": "1.0.0", "namespace": "state", "prefix": "$" },
     { "id": "Rulealize.Plugin.Tuple", "version": "1.0.0", "namespace": "tuple", "prefix": null },
-    { "id": "Rulealize.Plugin.TypeSchema", "version": "1.1.0", "namespace": "type", "prefix": null }
+    { "id": "Rulealize.Plugin.TypeSchema", "version": "1.1.0", "namespace": "type", "prefix": null },
+    { "id": "Rulealize.Registry.SmokeTest", "version": "0.0.1", "namespace": "smoketest", "prefix": null }
   ]
 }
