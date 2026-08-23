@@ -7,23 +7,19 @@ namespaces are already spoken for, and which shorthand characters are in use by 
 > **Status — early.** What exists is the claim ledger, the tools that check it and build the
 > catalogue from it, the jobs that hold a pull request to both, and the site — which is
 > [up](https://reny-develop.github.io/Rulealize.Registry/), labelled pre-release. Nothing
-> beyond the standard distribution is indexed yet.
+> has been submitted from outside the project yet.
 
 ## The ledger
 
 [`ledger/submitted.json`](ledger/submitted.json) records what each plugin claims — its
 identifier, its namespace and its shorthand character. **The first two have exactly one owner
 across the whole ecosystem.** The third has none: a character is recorded here and granted to
-nobody, and three are in use so far:
+nobody.
 
-| | Plugin | Namespace |
-| --- | --- | --- |
-| `@` | `Rulealize.Plugin.Binding` | `bind` |
-| `$` | `Rulealize.Plugin.State` | `state` |
-| `#` | `Rulealize.Plugin.Definition` | `def` |
-
-The namespaces taken are `bind`, `branch`, `cmp`, `def`, `graph`, `grid`, `logic`, `math`,
-`rec`, `seq`, `state`, `tuple` and `type`.
+Which identifiers, namespaces and characters are taken is in that file and on the
+[site](https://reny-develop.github.io/Rulealize.Registry/), and deliberately not repeated
+here. A list in this README would be a second copy of the ledger kept in step by whoever
+remembered, which is the same reason the operations are not in an entry.
 
 An entry is one line and four fields — the package, the version its claims were read at, the
 namespace and the shorthand character. **The operations are not in it.** Nobody submits a list
@@ -36,7 +32,7 @@ application performs. Run it against your own plugin and it prints what it found
 dotnet run --project tool/Ledger -- <plugin folder>
 ```
 
-It knows no plugin by name and has no list of the standard twelve.
+It knows no plugin by name and holds no list of them.
 
 **Nor is the rest of an entry believed.**
 [`.github/workflows/ledger.yml`](.github/workflows/ledger.yml) fetches every package the
@@ -68,7 +64,7 @@ dotnet run --project tool/Catalogue -- ledger/submitted.json work/probe/Rulealiz
 
 | | |
 | --- | --- |
-| `site/index.json` | every plugin and operation in summary — 10 KB for the standard distribution, which is what makes search a client-side matter |
+| `site/index.json` | every plugin and operation in summary — 10 KB at the size it is today, which is what makes search a client-side matter |
 | `site/plugin/<id>.json` | one plugin, every released version, every operation of each |
 
 The ledger holds one line per plugin because [a claim is permanent](doc/policy.md#a-claim-is-permanent);
@@ -124,8 +120,8 @@ second path to the same facts. The search on the front page fetches `/index.json
 other client would.
 
 **It is up**: <https://reny-develop.github.io/Rulealize.Registry/>. It carries `noindex` and
-says pre-release in its header, because what it indexes is still the standard distribution
-and nothing else.
+says pre-release in its header, because nothing has been submitted to it from outside the
+project yet.
 
 Every page says in its footer when the catalogue was last read out of nuget.org, and
 `/index.json` carries the same stamp to the second. An index nobody is keeping looks exactly
