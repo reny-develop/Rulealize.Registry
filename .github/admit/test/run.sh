@@ -114,6 +114,33 @@ declared() {
     report "$name" "$expect" "$reason" "$actual" "$output"
 }
 
+# rules <contexts as json> — a branch's active rules, in the shape the API answers with
+rules() {
+    jq -nc --argjson contexts "$1" \
+        '[ { type: "deletion" },
+           { type: "pull_request", parameters: { required_approving_review_count: 0 } },
+           { type: "required_status_checks",
+             parameters: { required_status_checks: ($contexts | map({ context: . })) } } ]'
+}
+
+# required <name> <agrees|refuses> <required json> <rules json> [reason]
+required() {
+    local name=$1 expect=$2 reason=${5:-}
+    printf '%s\n' "$3" > "$work/required.json"
+    printf '%s\n' "$4" > "$work/rules.json"
+
+    local output status actual
+    output=$("$here/../required.sh" "$work/required.json" "$work/rules.json" 2>&1)
+    status=$?
+    case $status in
+        0) actual=agrees ;;
+        1) actual=refuses ;;
+        *) actual="error($status)" ;;
+    esac
+
+    report "$name" "$expect" "$reason" "$actual" "$output"
+}
+
 acme=$(submission Acme.Deploy.Rules acme null)
 insert='.plugins = [$e] + .plugins'
 
@@ -251,6 +278,43 @@ declared refuses-a-reserved-namespace refuses \
     "$(jq -n --argjson p "[$(submission Str.Tools str null)]" '{ plugins: $p }')" \
     "$(ledger "$(derived Str.Tools str null)")" \
     "reserved namespace"
+
+echo
+echo "required:"
+
+must=$(jq -nc '{ checks: ["build", "cases", "rederive"] }')
+
+required agrees-with-the-branch agrees "$must" "$(rules '["build", "cases", "rederive"]')"
+
+# A branch may require more than a submission is admitted on. This says what has to be there.
+required agrees-with-more agrees "$must" "$(rules '["build", "cases", "rederive", "codeql"]')"
+
+required refuses-one-missing refuses "$must" "$(rules '["build", "cases"]')" \
+    '`rederive` is not a required status check'
+
+required refuses-no-status-rule refuses "$must" '[{ "type": "deletion" }]' \
+    "requires no status check"
+
+required refuses-no-rules refuses "$must" '[]' "requires no status check"
+
+# Anything that is not a list of rules is the branch answering something else, and it is not
+# evidence that a check is required.
+required refuses-another-answer refuses "$must" '{ "message": "Not Found" }' \
+    "did not answer with a list of rules"
+
+# The other end of the same list. A context no job reports under is one auto-merge waits on
+# for ever, which is a submission that never merges rather than one that merges too early.
+while IFS= read -r check; do
+    check=${check%$'\r'}
+    [[ -z "$check" ]] && continue
+    if grep -qE "^  ${check}:[[:space:]]*$" "$here/../../workflows/"*.yml; then
+        printf '  ok    %-26s %s\n' "names-a-job" "$check"
+        passed=$((passed + 1))
+    else
+        printf '  FAIL  %-26s `%s` is a job in no workflow\n' "names-a-job" "$check"
+        failed=$((failed + 1))
+    fi
+done < <(jq -r '.checks[]' "$here/../required.json")
 
 echo
 if [[ $failed -gt 0 ]]; then
