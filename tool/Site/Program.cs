@@ -477,7 +477,7 @@ static async Task WriteFront(List<Plugin> plugins, string output)
 
     body.Append("</tbody></table>");
 
-    string spent = string.Join(
+    string inUse = string.Join(
         ", ",
         plugins.Where(static plugin => plugin.Prefix is not null)
             .OrderBy(static plugin => plugin.Prefix, StringComparer.Ordinal)
@@ -485,13 +485,15 @@ static async Task WriteFront(List<Plugin> plugins, string output)
 
     body.Append($"""
         <h2>Shorthand characters</h2>
-        <p>Spent: {spent}. A string beginning with one is handed to that plugin's expander instead of
+        <p>In use: {inUse}. A string beginning with one is handed to that plugin's expander instead of
         being read as text, so the supply is one keystroke wide and cannot be extended — letters, digits
-        and anything ordinary data might begin with are unusable. <strong>Under a dozen remain for the
-        entire future of the ecosystem</strong>, which is why one is granted by review and the default
-        answer is no.</p>
-        <p><a href="https://github.com/reny-develop/Rulealize.Registry/blob/main/doc/policy.md#shorthand-characters">The
-        four things a grant has to clear</a>.</p>
+        and anything ordinary data might begin with are unusable. <strong>Under a dozen exist for the
+        entire future of the ecosystem</strong>, and none of them is taken: a character is recorded here
+        and granted to nobody, so a plugin may reserve one another plugin already reserved. The two load
+        together, and a rule set that would otherwise be ambiguous names the vocabulary it meant —
+        <code>"$state:board"</code>.</p>
+        <p><a href="https://github.com/reny-develop/Rulealize.Registry/blob/main/doc/policy.md#shorthand-characters">What
+        is refused, and the two things worth knowing first</a>.</p>
         """);
 
     body.Append("""
