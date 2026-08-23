@@ -166,4 +166,14 @@ a description.
 
 ## License
 
-Apache-2.0.
+Apache-2.0 covers what this repository is made of — the tools under [`tool/`](tool/), the
+jobs and scripts under [`.github/`](.github/), and the prose.
+
+The ledger is not that. [`ledger/`](ledger/) is a record of who claimed which identifier,
+namespace and shorthand character, and it is dedicated to the public domain under
+[CC0-1.0](ledger/LICENSE-CC0), as is the catalogue built from it — mirror it, embed it in a
+resolver, no attribution asked.
+
+**An indexed plugin is licensed by whoever published it.** An entry is a pointer to a package
+and holds nothing of the package itself, so nothing here states the terms of what it points
+at.
