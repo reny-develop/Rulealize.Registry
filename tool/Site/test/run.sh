@@ -81,6 +81,52 @@ report $? "renders a catalogue that does not say when it was checked"
 ! grep -rq --include='*.html' 'Last checked' "$work/plain"
 report $? "leaves the line off rather than inventing one"
 
+# 4. A plugin with releases the catalogue would not index. Their publisher is the only party
+# who can put that right and the only one nothing tells, so the pages are where it is said: the
+# release is on them, marked, carrying what it claimed against what the ledger admits. What is
+# withheld is the indexing — the version does not become `latest` and its operations are not
+# offered — and not the fact.
+mkdir -p "$work/withheld"
+(cd "$root" && dotnet run --project tool/Site -c Release -- tool/Site/test/withheld "$work/withheld" > /dev/null 2>&1)
+report $? "renders a catalogue with a withheld release"
+
+page="$work/withheld/plugin/Withheld.Rules.html"
+
+grep -q 'not indexed' "$page"
+report $? "marks the withheld release"
+
+grep -q '<code>acme</code>' "$page"
+report $? "says the namespace the withheld release claimed"
+
+grep -q 'the ledger admits <code>held</code>' "$page"
+report $? "says what the ledger admits instead"
+
+grep -q 'Nothing could be read out of this release' "$page"
+report $? "says when a release could not be read at all"
+
+# The one that would be silently wrong. Taking the newest release rather than the newest
+# indexed one leaves a plugin with no operations at all and a latest nobody may resolve to.
+grep -q '<th>Latest</th><td><code>1.1.0</code>' "$page"
+report $? "reports the newest indexed release as the latest"
+
+[[ -f "$work/withheld/op/held.two.html" ]]
+report $? "writes the operations of the newest indexed release"
+
+grep -q '2 withheld' "$work/withheld/index.html"
+report $? "marks the plugin on the claim table"
+
+# 5. Every release withheld. There is no latest to name and no operation to offer, and the
+# plugin is on the pages anyway — it is the case where saying so matters most.
+mkdir -p "$work/all"
+(cd "$root" && dotnet run --project tool/Site -c Release -- tool/Site/test/all-withheld "$work/all" > /dev/null 2>&1)
+report $? "renders a catalogue whose every release is withheld"
+
+grep -q 'none indexed' "$work/all/plugin/Nothing.Rules.html"
+report $? "says there is no indexed release"
+
+[[ -z "$(ls -A "$work/all/op")" ]]
+report $? "offers no operation from a plugin with no indexed release"
+
 echo
 if [[ $failed -gt 0 ]]; then
     echo "$failed failed."

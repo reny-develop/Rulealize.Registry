@@ -53,7 +53,7 @@ jobs:
 
           ${URL}
 
-          If this is the daily catalogue run, the likely causes are a plugin that changed its namespace between releases, or a package the ledger names that nuget.org no longer serves. The site keeps serving what was last published until this is fixed."
+          If this is the daily catalogue run, the likely cause is a package the ledger names that nuget.org serves no released version of. A release whose claims moved is not one of these: that one is withheld from the index and published as withheld, and the run goes on. The site keeps serving what was last published until this is fixed."
 
           if [[ -n "$number" ]]; then
             gh issue comment "$number" --body "$body"

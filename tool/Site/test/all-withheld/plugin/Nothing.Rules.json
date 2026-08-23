@@ -1,0 +1,13 @@
+{
+  "$schema": "rulealize/registry/plugin/v1",
+  "id": "Nothing.Rules",
+  "namespace": "nothing",
+  "prefix": null,
+  "admitted": "1.0.0",
+  "versions": [
+    {
+      "version": "1.0.0",
+      "withheld": "unreadable"
+    }
+  ]
+}

@@ -1,0 +1,13 @@
+{
+  "$schema": "rulealize/registry/index/v1",
+  "checked": "2026-08-23T04:00:00Z",
+  "plugins": [
+    {
+      "id": "Nothing.Rules",
+      "namespace": "nothing",
+      "prefix": null,
+      "withheld": 1
+    }
+  ],
+  "operations": []
+}

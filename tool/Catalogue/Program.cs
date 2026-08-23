@@ -24,9 +24,15 @@ using System.Xml.Linq;
 // It follows that a new version of a plugin already in the ledger needs no pull request at
 // all: nothing committed changes, and the catalogue picks it up the next time this runs.
 // What that would otherwise let through is a plugin quietly changing its namespace between
-// versions, so this checks every version's claims against the ledger and fails on the first
-// that disagrees. The policy that a claim is permanent is enforced here, mechanically, while
-// the file a human reads does not move.
+// versions, so this checks every version's claims against the ledger. One that says something
+// else is withheld: it stays in the entry, marked, carrying what it claimed, and nothing is
+// indexed off it — not its operations and not the plugin's `latest`. The policy that a claim
+// is permanent is enforced here, mechanically, while the file a human reads does not move.
+//
+// Withheld rather than fatal, because the publisher is the only party who can put it right
+// and a run that wrote nothing would tell everybody except them. What does stop this is the
+// ledger naming a package nuget.org has no released version of, which is this repository
+// pointing at something that is not there.
 //
 // <probe> is tool/Ledger, built. This tool loads no plugin itself — see the project file for
 // why it cannot — and runs that one per version instead, reading the JSON it writes to
@@ -76,28 +82,58 @@ foreach (JsonElement claim in ledger.RootElement.GetProperty("plugins").Enumerat
     }
 
     List<VersionEntry> entries = [];
-    Package? latest = null;
+    Package? indexed = null;
 
     foreach (string version in versions)
     {
-        Package package = await Fetch(id, version);
-        latest = package;
-
-        // The claims are the ledger's to state and every version's to honour.
-        if (package.Namespace != ns || package.Prefix != prefix)
+        Package package;
+        try
         {
-            violations.Add(
-                $"{id} {version} claims namespace '{package.Namespace}' and prefix {Show(package.Prefix)}, "
-                + $"where the ledger admitted '{ns}' and {Show(prefix)}. A claim is permanent.");
+            package = await Fetch(id, version);
+        }
+        catch (Exception failure) when (failure is not (HttpRequestException or TaskCanceledException))
+        {
+            // Something published that nothing can be read out of: two target frameworks, no
+            // lib folder, an assembly the probe refused. It is one publisher's upload and it
+            // withholds one version, rather than the index everybody else is in.
+            //
+            // Not a fetch that failed. nuget.org not answering is this run being unable to
+            // look, and the entry it would write is a guess about somebody else's package.
+            Console.Error.WriteLine($"{id} {version} could not be read: {failure.Message}");
+            entries.Add(VersionEntry.Unreadable(version));
+            continue;
         }
 
-        entries.Add(new VersionEntry(version, package.Abstraction, package.Framework, package.Operations));
+        // The claims are the ledger's to state and every version's to honour. One that says
+        // something else is withheld rather than indexed — its operations are named in a
+        // namespace this plugin does not hold — and the entry records what it said instead,
+        // because the publisher is the only party who can put it right and the only one who
+        // is not told.
+        if (package.Namespace != ns || package.Prefix != prefix)
+        {
+            Console.Error.WriteLine(
+                $"{id} {version} claims namespace '{package.Namespace}' and prefix {Show(package.Prefix)}, "
+                + $"where the ledger admitted '{ns}' and {Show(prefix)}. A claim is permanent.");
+            entries.Add(VersionEntry.Moved(version, package));
+            continue;
+        }
+
+        indexed = package;
+        entries.Add(new VersionEntry(version, package.Abstraction, package.Framework, package.Operations, null, null));
     }
 
-    catalogued.Add(new PluginEntry(
-        id, ns, prefix, admitted, versions[^1], latest!.Description, latest.Repository, latest.License, entries));
+    // Everything the plugin is described by comes off its newest indexed release. A withheld
+    // one describes a plugin the ledger does not hold.
+    VersionEntry? newest = entries.LastOrDefault(static entry => entry.Withheld is null);
+    int withheld = entries.Count(static entry => entry.Withheld is not null);
 
-    Console.Error.WriteLine($"{id}: {versions.Count} version(s), latest {versions[^1]}");
+    catalogued.Add(new PluginEntry(
+        id, ns, prefix, admitted, newest?.Version,
+        indexed?.Description, indexed?.Repository, indexed?.License, entries));
+
+    Console.Error.WriteLine(
+        $"{id}: {entries.Count} version(s), latest {newest?.Version ?? "none indexed"}"
+        + (withheld is 0 ? "" : $", {withheld} withheld"));
 }
 
 if (violations.Count is not 0)
@@ -275,7 +311,7 @@ static void WriteCatalogue(List<PluginEntry> plugins, string folder)
             writer.WriteString("namespace", plugin.Namespace);
             WritePrefix(writer, plugin.Prefix);
             writer.WriteString("admitted", plugin.Admitted);
-            writer.WriteString("latest", plugin.Latest);
+            WriteOptional(writer, "latest", plugin.Latest);
             WriteOptional(writer, "description", plugin.Description);
             WriteOptional(writer, "repository", plugin.Repository);
             WriteOptional(writer, "license", plugin.License);
@@ -287,9 +323,31 @@ static void WriteCatalogue(List<PluginEntry> plugins, string folder)
                 writer.WriteStartObject();
                 writer.WriteString("version", version.Version);
                 WriteOptional(writer, "abstraction", version.Abstraction);
-                writer.WriteString("framework", version.Framework);
-                writer.WritePropertyName("operations");
-                version.Operations.WriteTo(writer);
+                WriteOptional(writer, "framework", version.Framework);
+
+                // `withheld` is the whole of what a reader has to look at: it is on a version
+                // that is not in the index, and it is the only thing that decides that. What
+                // that version claimed is beside it, against the plugin's own namespace and
+                // prefix in this same file, so a page can say both without being told either.
+                if (version.Withheld is string withheld)
+                {
+                    writer.WriteString("withheld", withheld);
+
+                    if (version.Claimed is Claim claimed)
+                    {
+                        writer.WritePropertyName("claimed");
+                        writer.WriteStartObject();
+                        writer.WriteString("namespace", claimed.Namespace);
+                        WritePrefix(writer, claimed.Prefix);
+                        writer.WriteEndObject();
+                    }
+                }
+                else
+                {
+                    writer.WritePropertyName("operations");
+                    version.Operations!.Value.WriteTo(writer);
+                }
+
                 writer.WriteEndObject();
             }
 
@@ -319,7 +377,11 @@ static void WriteCatalogue(List<PluginEntry> plugins, string folder)
             writer.WriteString("id", plugin.Id);
             writer.WriteString("namespace", plugin.Namespace);
             WritePrefix(writer, plugin.Prefix);
-            writer.WriteString("latest", plugin.Latest);
+            WriteOptional(writer, "latest", plugin.Latest);
+
+            // How many of its releases are not in the index, so that a client listing plugins
+            // can say so without fetching every entry to count them.
+            writer.WriteNumber("withheld", plugin.Versions.Count(static version => version.Withheld is not null));
             WriteOptional(writer, "description", plugin.Description);
             writer.WriteEndObject();
         }
@@ -332,8 +394,12 @@ static void WriteCatalogue(List<PluginEntry> plugins, string folder)
         writer.WriteStartArray();
         foreach (PluginEntry plugin in plugins)
         {
-            JsonElement operations = plugin.Versions[^1].Operations;
-            foreach (JsonProperty kind in operations.EnumerateObject())
+            if (plugin.Versions.LastOrDefault(static version => version.Withheld is null) is not VersionEntry newest)
+            {
+                continue;
+            }
+
+            foreach (JsonProperty kind in newest.Operations!.Value.EnumerateObject())
             {
                 foreach (JsonElement op in kind.Value.EnumerateArray())
                 {
@@ -409,14 +475,33 @@ internal sealed record Package(
     string? Repository,
     string? License);
 
-internal sealed record VersionEntry(string Version, string? Abstraction, string Framework, JsonElement Operations);
+// Operations are there when the version is in the index, and Withheld says so when it is not:
+// "claims" for one whose namespace or shorthand character is not the ledger's, with Claimed
+// carrying what it said instead, and "unreadable" for one nothing could be read out of.
+internal sealed record VersionEntry(
+    string Version,
+    string? Abstraction,
+    string? Framework,
+    JsonElement? Operations,
+    string? Withheld,
+    Claim? Claimed)
+{
+    internal static VersionEntry Unreadable(string version) =>
+        new(version, null, null, null, "unreadable", null);
+
+    internal static VersionEntry Moved(string version, Package package) =>
+        new(version, package.Abstraction, package.Framework, null, "claims",
+            new Claim(package.Namespace, package.Prefix));
+}
+
+internal sealed record Claim(string Namespace, string? Prefix);
 
 internal sealed record PluginEntry(
     string Id,
     string Namespace,
     string? Prefix,
     string Admitted,
-    string Latest,
+    string? Latest,
     string? Description,
     string? Repository,
     string? License,
