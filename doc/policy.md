@@ -154,6 +154,17 @@ signature and no sandbox. That is reasonable for a runtime whose plugins are all
 author's, and it is exactly what an ecosystem changes — so this index says so as plainly as
 a package feed does, rather than implying an inspection it does not perform.
 
+That applies to this registry as much as to an application, and it is how every entry here is
+derived. The namespace, the shorthand character and every operation in the catalogue are what
+a package said when CI loaded it — on a runner, unsigned, with nothing reproduced. A package
+that answers one way there and another way in somebody's application is not something anything
+here can catch.
+
+What that costs is bounded by the runtime rather than by anything here. Claims that are not
+the ones the ledger recorded collide with whoever holds them, and `OperationTable.Claim`
+refuses the folder they are both in — so a plugin that says one thing to this registry and
+another to a deployment is a plugin that will not load beside the ones it misdeclared.
+
 **Whether an operation is a good idea.** If it loads and its claims are free, it is in.
 
 Nothing here will ever be labelled "verified" on any of those grounds. A badge that read as
