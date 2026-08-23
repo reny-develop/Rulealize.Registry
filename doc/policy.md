@@ -138,6 +138,14 @@ plugin folder next. No recovered name is worth that.
 Ownership moves with the package. If nuget.org says an identifier changed hands, so does
 everything the ledger records under it.
 
+**A release claiming something else is withheld, not admitted.** Publishing a version under a
+namespace or a shorthand character the ledger did not record does not move the claim. That
+release stays out of the index — its operations are not offered, and `latest` stays at the
+newest release that still agrees — while the catalogue and
+[the plugin's page](https://reny-develop.github.io/Rulealize.Registry/) carry it marked, with
+what it claimed beside what the ledger admits. Nothing is taken from anybody and nothing
+resolves to it. The way back is a release that claims what the ledger records.
+
 ## What is not policed
 
 **Quality, usefulness, and taste.** The ledger records claims; it does not rank vocabularies.

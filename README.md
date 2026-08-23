@@ -78,8 +78,10 @@ no pull request** — nothing committed changes, and the next scheduled run pick
 
 What that would otherwise let through is a plugin changing its namespace quietly between
 releases. [`catalogue.yml`](.github/workflows/catalogue.yml) checks every version's claims
-against the ledger and writes nothing at all if one disagrees, so the rule is enforced daily
-while the file a person reads does not move.
+against the ledger, and a version that disagrees is **withheld**: it stays in the entry and on
+the plugin's page, marked, carrying what it claimed, and nothing is indexed off it — not its
+operations, and not the plugin's `latest`. So the rule is enforced daily, the file a person
+reads does not move, and the one party who can put it right is the one it is said to.
 
 Nothing hand-written goes into a catalogue entry. The description, repository, licence and
 abstraction version are in the `.nuspec`; the claims and operations are in the assembly. A

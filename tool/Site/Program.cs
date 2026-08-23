@@ -58,17 +58,28 @@ foreach (JsonElement summary in index.RootElement.GetProperty("plugins").Enumera
     List<Release> releases = [];
     foreach (JsonElement release in root.GetProperty("versions").EnumerateArray())
     {
+        // A release the catalogue withheld has none, because its operations are named in a
+        // namespace the plugin does not hold.
         Dictionary<string, List<string>> operations = [];
-        foreach (JsonProperty kind in release.GetProperty("operations").EnumerateObject())
+        if (release.TryGetProperty("operations", out JsonElement registered))
         {
-            operations[kind.Name] = [.. kind.Value.EnumerateArray().Select(static op => op.GetString()!)];
+            foreach (JsonProperty kind in registered.EnumerateObject())
+            {
+                operations[kind.Name] = [.. kind.Value.EnumerateArray().Select(static op => op.GetString()!)];
+            }
         }
+
+        Claimed? claimed = release.TryGetProperty("claimed", out JsonElement said)
+            ? new Claimed(Text(said, "namespace"), Text(said, "prefix"))
+            : null;
 
         releases.Add(new Release(
             release.GetProperty("version").GetString()!,
             Text(release, "abstraction"),
             Text(release, "framework"),
-            operations));
+            operations,
+            Text(release, "withheld"),
+            claimed));
     }
 
     plugins.Add(new Plugin(
@@ -76,7 +87,7 @@ foreach (JsonElement summary in index.RootElement.GetProperty("plugins").Enumera
         root.GetProperty("namespace").GetString()!,
         root.GetProperty("prefix").ValueKind is JsonValueKind.Null ? null : root.GetProperty("prefix").GetString(),
         root.GetProperty("admitted").GetString()!,
-        root.GetProperty("latest").GetString()!,
+        Text(root, "latest"),
         Text(root, "description"),
         Text(root, "repository"),
         Text(root, "license"),
@@ -132,12 +143,17 @@ foreach (Plugin plugin in plugins)
     await Write(Path.Combine(output, "plugin", $"{plugin.Id}.html"), plugin.Id, "..", PluginBody(plugin));
 }
 
-// One page per operation, over the latest release of each plugin — a name withdrawn two
-// versions ago is not one to offer, and the plugin's own page still records that it existed.
+// One page per operation, over the latest indexed release of each plugin — a name withdrawn
+// two versions ago is not one to offer, and the plugin's own page still records that it
+// existed. A plugin whose every release was withheld offers none at all.
 int written = 0;
 foreach (Plugin plugin in plugins)
 {
-    Release latest = plugin.Releases[^1];
+    if (plugin.Indexed is not Release latest)
+    {
+        continue;
+    }
+
     foreach ((string kind, List<string> operations) in latest.Operations)
     {
         foreach (string op in operations)
@@ -256,7 +272,8 @@ static string PluginBody(Plugin plugin)
     body.Append($"<tr><th>Namespace</th><td><code>{H(plugin.Namespace)}</code></td></tr>");
     body.Append(
         $"<tr><th>Shorthand</th><td>{(plugin.Prefix is null ? "<span class=\"none\">none</span>" : $"<code>{H(plugin.Prefix)}</code>")}</td></tr>");
-    body.Append($"<tr><th>Latest</th><td><code>{H(plugin.Latest)}</code></td></tr>");
+    body.Append(
+        $"<tr><th>Latest</th><td>{(plugin.Latest is null ? "<span class=\"none\">none indexed</span>" : $"<code>{H(plugin.Latest)}</code>")}</td></tr>");
     body.Append($"<tr><th>Admitted at</th><td><code>{H(plugin.Admitted)}</code></td></tr>");
 
     if (plugin.License is not null)
@@ -285,12 +302,35 @@ static string PluginBody(Plugin plugin)
 
     foreach (Release release in plugin.Releases.AsEnumerable().Reverse())
     {
-        body.Append($"<h2>{H(release.Version)}</h2>");
+        body.Append($"<h2>{H(release.Version)}");
+        if (release.Withheld is not null)
+        {
+            body.Append(" <span class=\"warn\">not indexed</span>");
+        }
+
+        body.Append("</h2>");
+
+        // The one thing on these pages addressed to the plugin's author rather than to
+        // somebody reading a rule set. Nothing else tells them: the catalogue is rebuilt
+        // without asking anybody, and a release that quietly went missing from an index reads
+        // as an index that is behind.
+        if (release.Withheld is string withheld)
+        {
+            body.Append($"<p class=\"withheld\">{Withheld(plugin, release, withheld)}</p>");
+            continue;
+        }
+
         body.Append("<p class=\"meta\">");
-        body.Append($"targets <code>{H(release.Framework)}</code>");
+        if (release.Framework is not null)
+        {
+            body.Append($"targets <code>{H(release.Framework)}</code>");
+        }
+
         if (release.Abstraction is not null)
         {
-            body.Append($", built against <code>Rulealize.Abstraction {H(release.Abstraction)}</code>");
+            body.Append(
+                $"{(release.Framework is null ? "b" : ", b")}uilt against "
+                + $"<code>Rulealize.Abstraction {H(release.Abstraction)}</code>");
         }
 
         body.Append("</p>");
@@ -313,6 +353,41 @@ static string PluginBody(Plugin plugin)
     }
 
     return body.ToString();
+}
+
+// Why a release is not in the index. What the ledger holds is elsewhere on the same page, so
+// this is the half of the comparison that is nowhere else: what the release claimed instead.
+static string Withheld(Plugin plugin, Release release, string reason)
+{
+    if (reason is not "claims" || release.Claimed is not Claimed claimed)
+    {
+        return "Nothing could be read out of this release — two target frameworks, no "
+            + "<code>lib</code> folder, or an assembly the loader refused — so it is not in the index.";
+    }
+
+    List<string> moved = [];
+    if (claimed.Namespace != plugin.Namespace)
+    {
+        moved.Add(
+            $"claims the namespace <code>{H(claimed.Namespace)}</code>, where the ledger admits "
+            + $"<code>{H(plugin.Namespace)}</code>");
+    }
+
+    if (claimed.Prefix != plugin.Prefix)
+    {
+        moved.Add($"claims {Shorthand(claimed.Prefix)}, where the ledger admits {Shorthand(plugin.Prefix)}");
+    }
+
+    if (moved.Count is 0)
+    {
+        moved.Add("claims something other than what the ledger admits");
+    }
+
+    return $"This release {string.Join(", and ", moved)}. A claim is permanent, so it is not in the "
+        + "index: its operations are not offered here, and nothing that reads this resolves to it.";
+
+    static string Shorthand(string? prefix) =>
+        prefix is null ? "no shorthand character" : $"the shorthand character <code>{H(prefix)}</code>";
 }
 
 static string OperationBody(string op, string kind, Plugin plugin)
@@ -377,13 +452,25 @@ static async Task WriteFront(List<Plugin> plugins, string output)
 
     foreach (Plugin plugin in plugins.OrderBy(static plugin => plugin.Namespace, StringComparer.Ordinal))
     {
-        int operations = plugin.Releases[^1].Operations.Sum(static kind => kind.Value.Count);
+        int operations = plugin.Indexed?.Operations.Sum(static kind => kind.Value.Count) ?? 0;
+        int withheld = plugin.Releases.Count(static release => release.Withheld is not null);
+
         body.Append("<tr>");
         body.Append($"<td><code>{H(plugin.Namespace)}</code></td>");
         body.Append(
             $"<td>{(plugin.Prefix is null ? "<span class=\"none\">—</span>" : $"<code>{H(plugin.Prefix)}</code>")}</td>");
         body.Append($"<td><a href=\"plugin/{H(plugin.Id)}.html\">{H(plugin.Id)}</a></td>");
-        body.Append($"<td><code>{H(plugin.Latest)}</code></td>");
+        body.Append(
+            $"<td>{(plugin.Latest is null ? "<span class=\"none\">—</span>" : $"<code>{H(plugin.Latest)}</code>")}");
+
+        // A release that is published and not indexed, said where somebody scanning the table
+        // for their own plugin will see it.
+        if (withheld is not 0)
+        {
+            body.Append($" <span class=\"warn\">{withheld} withheld</span>");
+        }
+
+        body.Append("</td>");
         body.Append($"<td class=\"n\">{operations}</td>");
         body.Append("</tr>");
     }
@@ -459,18 +546,32 @@ static async Task WriteFront(List<Plugin> plugins, string output)
     await Write(Path.Combine(output, "index.html"), "Rulealize Registry", ".", body.ToString());
 }
 
-internal sealed record Release(string Version, string? Abstraction, string? Framework, Dictionary<string, List<string>> Operations);
+// Withheld is what the catalogue said about a release it did not index, and Claimed is what
+// that release claimed instead. Both are absent from a release that is in the index.
+internal sealed record Release(
+    string Version,
+    string? Abstraction,
+    string? Framework,
+    Dictionary<string, List<string>> Operations,
+    string? Withheld,
+    Claimed? Claimed);
+
+internal sealed record Claimed(string? Namespace, string? Prefix);
 
 internal sealed record Plugin(
     string Id,
     string Namespace,
     string? Prefix,
     string Admitted,
-    string Latest,
+    string? Latest,
     string? Description,
     string? Repository,
     string? License,
-    List<Release> Releases);
+    List<Release> Releases)
+{
+    /// <summary>The newest release the catalogue indexed, if it indexed any.</summary>
+    internal Release? Indexed => Releases.LastOrDefault(static release => release.Withheld is null);
+}
 
 internal static partial class Program
 {
@@ -511,6 +612,12 @@ internal static partial class Program
         .lede { font-size: 1.05rem; color: var(--dim); }
         .meta { color: var(--dim); font-size: .875rem; }
         .none { color: var(--dim); }
+        .warn { color: var(--notice); font-size: .8rem; font-weight: 600; white-space: nowrap; }
+        .withheld {
+          padding: .5rem .75rem; border-radius: 4px;
+          background: var(--notice-bg); color: var(--notice); font-size: .875rem;
+        }
+        .withheld code { background: none; padding: 0; }
         a { color: var(--accent); }
         code {
           font-family: ui-monospace, "Cascadia Code", Consolas, monospace; font-size: .9em;

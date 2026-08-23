@@ -1,0 +1,18 @@
+{
+  "$schema": "rulealize/registry/index/v1",
+  "checked": "2026-08-23T04:00:00Z",
+  "plugins": [
+    {
+      "id": "Withheld.Rules",
+      "namespace": "held",
+      "prefix": null,
+      "latest": "1.1.0",
+      "withheld": 2,
+      "description": "A plugin with two releases the catalogue would not index."
+    }
+  ],
+  "operations": [
+    { "op": "held.one", "kind": "expression", "plugin": "Withheld.Rules" },
+    { "op": "held.two", "kind": "expression", "plugin": "Withheld.Rules" }
+  ]
+}
