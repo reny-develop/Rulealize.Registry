@@ -180,7 +180,18 @@ gate fixes-a-bad-namespace fix "lowercase letters and digits" \
 
 gate fixes-nothing-added fix "adds no plugin" < "$work/base.json"
 
+# A second line for a package already in the ledger. It states nothing new — the assembly it
+# names agrees with it, so declared.sh has nothing to refuse — and the catalogue would carry
+# the plugin twice.
+gate fixes-a-duplicate fix "one line per plugin" \
+    <<<"$(jq --argjson e "$(submission Rulealize.Plugin.Binding bind '"@"' 2.0.0)" \
+        '.plugins = .plugins + [$e]' "$work/base.json")"
+
 gate fixes-broken-json fix "not valid JSON" <<<'{ "plugins": ['
+
+# The file itself, gone. Every claim in the ledger goes with it, so this is not a submission
+# with a mistake in it.
+gate closes-a-deletion close "leaves no" < /dev/null
 
 BASE_REF=release \
     gate fixes-another-base fix "does not target" \
