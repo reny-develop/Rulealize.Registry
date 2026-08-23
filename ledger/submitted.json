@@ -4,6 +4,7 @@
     { "id": "Rulealize.Plugin.Arithmetic", "version": "1.0.0", "namespace": "math", "prefix": null },
     { "id": "Rulealize.Plugin.Binding", "version": "1.0.0", "namespace": "bind", "prefix": "@" },
     { "id": "Rulealize.Plugin.Branch", "version": "1.0.0", "namespace": "branch", "prefix": null },
+    { "id": "Rulealize.Plugin.Chance", "version": "1.0.0", "namespace": "chance", "prefix": null },
     { "id": "Rulealize.Plugin.Comparison", "version": "1.0.0", "namespace": "cmp", "prefix": null },
     { "id": "Rulealize.Plugin.Definition", "version": "1.0.0", "namespace": "def", "prefix": "#" },
     { "id": "Rulealize.Plugin.Graph", "version": "1.0.0", "namespace": "graph", "prefix": null },
