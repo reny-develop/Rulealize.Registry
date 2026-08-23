@@ -18,7 +18,7 @@
     plugin, by package or otherwise, and could not name a plugin type if it wanted to.
   -->
   <ItemGroup>
-    <PackageReference Include="Rulealize" Version="0.4.0" />
+    <PackageReference Include="Rulealize" Version="0.5.0" />
   </ItemGroup>
 
 </Project>
