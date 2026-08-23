@@ -94,8 +94,13 @@ if [[ "$changed" != "ledger/submitted.json" ]]; then
 $(sed 's/^/  - `/;s/$/`/' <<<"$changed")"
 fi
 
-if [[ ! -s "$head" ]] || ! jq -e . "$head" >/dev/null 2>&1; then
-    fix "\`ledger/submitted.json\` is missing or is not valid JSON."
+if [[ ! -s "$head" ]]; then
+    close "It leaves no \`ledger/submitted.json\`, and that file is the ledger."
+    verdict
+fi
+
+if ! jq -e . "$head" >/dev/null 2>&1; then
+    fix "\`ledger/submitted.json\` is not valid JSON."
     verdict
 fi
 
@@ -122,6 +127,15 @@ fi
 
 if ! jq -e '.plugins | map(.id) == (map(.id) | sort)' "$head" >/dev/null 2>&1; then
     fix "The entries are not in identifier order."
+fi
+
+# One line per plugin. A second line for a package already in the ledger states nothing new —
+# it agrees with the same assembly the first one does, so nothing downstream would refuse it,
+# and the catalogue would carry the plugin twice.
+duplicated=$(jq -r '.plugins | map(.id) | group_by(.) | map(select(length > 1) | .[0]) | .[]' "$head" 2>/dev/null)
+if [[ -n "$duplicated" ]]; then
+    fix "The ledger holds one line per plugin, and these are on more than one:
+$(sed 's/^/  - `/;s/$/`/' <<<"$duplicated")"
 fi
 
 added=$(jq -c --slurpfile base "$base" '.plugins - $base[0].plugins' "$head" 2>/dev/null)
