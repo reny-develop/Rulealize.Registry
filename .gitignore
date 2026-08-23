@@ -366,3 +366,6 @@ FodyWeavers.xsd
 .vscode/
 # Claude Code, personal settings
 .claude/settings.local.json
+
+# Where the readme's commands build the probe, the catalogue and the pages
+work/
