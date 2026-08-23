@@ -3,6 +3,7 @@
 
 using System.Diagnostics;
 using System.IO.Compression;
+using System.Net;
 using System.Text;
 using System.Text.Encodings.Web;
 using System.Text.Json;
@@ -77,7 +78,9 @@ foreach (JsonElement claim in ledger.RootElement.GetProperty("plugins").Enumerat
     List<string> versions = await ReleasedVersions(id);
     if (versions.Count is 0)
     {
-        violations.Add($"{id}: the ledger admits it, and nuget.org has no released version of it.");
+        violations.Add(
+            $"{id}: nuget.org serves no released version of it. A package is fetched by the identifier "
+            + "the ledger records, so that is the identifier it has to be published under.");
         continue;
     }
 
@@ -158,7 +161,19 @@ return 0;
 async Task<List<string>> ReleasedVersions(string id)
 {
     string url = $"{FlatContainer}/{id.ToLowerInvariant()}/index.json";
-    using JsonDocument index = JsonDocument.Parse(await http.GetStringAsync(url));
+
+    // A 404 is nuget.org saying there is no package of that name, which is a thing about the
+    // ledger and is answered as one where this returns. Every other answer is this run unable
+    // to look, and it stops there rather than reporting an absence it has not established.
+    using HttpResponseMessage answer = await http.GetAsync(url);
+    if (answer.StatusCode is HttpStatusCode.NotFound)
+    {
+        return [];
+    }
+
+    answer.EnsureSuccessStatusCode();
+
+    using JsonDocument index = JsonDocument.Parse(await answer.Content.ReadAsStringAsync());
 
     List<string> released = [];
     foreach (JsonElement element in index.RootElement.GetProperty("versions").EnumerateArray())
