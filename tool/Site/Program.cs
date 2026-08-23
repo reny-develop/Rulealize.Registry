@@ -477,11 +477,15 @@ static async Task WriteFront(List<Plugin> plugins, string output)
 
     body.Append("</tbody></table>");
 
-    string inUse = string.Join(
+    string characters = string.Join(
         ", ",
         plugins.Where(static plugin => plugin.Prefix is not null)
             .OrderBy(static plugin => plugin.Prefix, StringComparer.Ordinal)
             .Select(static plugin => $"<code>{H(plugin.Prefix)}</code> ({H(plugin.Namespace)})"));
+
+    // A catalogue where nobody has reserved one is a sentence with a list in the middle of it
+    // and nothing to put there. That none are in use is a true thing to say about it.
+    string inUse = characters.Length is 0 ? "<span class=\"none\">none</span>" : characters;
 
     body.Append($"""
         <h2>Shorthand characters</h2>

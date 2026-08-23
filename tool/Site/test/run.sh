@@ -81,6 +81,11 @@ report $? "renders a catalogue that does not say when it was checked"
 ! grep -rq --include='*.html' 'Last checked' "$work/plain"
 report $? "leaves the line off rather than inventing one"
 
+# No plugin in it reserves a shorthand character either, and the front page names the ones
+# that are in use in the middle of a sentence.
+grep -q 'In use: <span class="none">none</span>' "$work/plain/index.html"
+report $? "says none rather than an empty list of shorthand characters"
+
 # 4. A plugin with releases the catalogue would not index. Their publisher is the only party
 # who can put that right and the only one nothing tells, so the pages are where it is said: the
 # release is on them, marked, carrying what it claimed against what the ledger admits. What is
