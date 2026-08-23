@@ -17,6 +17,11 @@
 # gate reads the pull request as data and never runs a line of it. The only thing that comes
 # out of the pull request is JSON, read with `git show` and handed to jq.
 #
+# Auto-merge merges on the checks the branch requires, and which those are is a setting rather
+# than a file in this repository. .github/admit/required.sh reads it at the moment this relies
+# on it, so a branch that has stopped requiring them holds the submission instead of admitting
+# it.
+#
 # The rules themselves are in .github/admit/gate.sh, with a case for each in
 # .github/admit/test/. They are not written here, because a rule nobody can run locally is a
 # rule nobody can test.
@@ -92,12 +97,56 @@ jobs:
             echo 'GATE_EOF'
           } >> "$GITHUB_OUTPUT"
 
+      # What auto-merge would hold this to. Turning it on merges the moment the *required*
+      # checks pass, and which checks those are is a branch setting rather than a file here —
+      # so it is read at the moment it is relied on and held to .github/admit/required.json.
+      # A branch that requires nothing would otherwise merge a submission before its package
+      # had been fetched, and nothing in this repository would have said so.
+      - name: Check what main requires
+        id: required
+        if: steps.gate.outputs.verdict == 'admit'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set +e
+          gh api "repos/${GITHUB_REPOSITORY}/rules/branches/main" > work/rules.json
+          if [[ $? -ne 0 ]]; then
+            reasons='`main` could not be asked what it requires.'
+            status=1
+          else
+            reasons=$(bash .github/admit/required.sh .github/admit/required.json work/rules.json)
+            status=$?
+          fi
+          set -e
+
+          # Exit 2 is the check failing rather than refusing, and it leaves the pull request
+          # unmerged and this job red, which is the right way round.
+          if [[ $status -eq 2 ]]; then
+            echo "::error::What main requires could not be read."
+            echo "$reasons"
+            exit $status
+          fi
+
+          if [[ $status -eq 0 ]]; then
+            echo "ok=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "ok=false" >> "$GITHUB_OUTPUT"
+          fi
+
+          {
+            echo 'reasons<<REQUIRED_EOF'
+            echo "$reasons"
+            echo 'REQUIRED_EOF'
+          } >> "$GITHUB_OUTPUT"
+
       - name: Act on it
         env:
           GH_TOKEN: ${{ github.token }}
           PR: ${{ github.event.pull_request.number }}
           VERDICT: ${{ steps.gate.outputs.verdict }}
           REASONS: ${{ steps.gate.outputs.reasons }}
+          REQUIRED_OK: ${{ steps.required.outputs.ok }}
+          REQUIRED_REASONS: ${{ steps.required.outputs.reasons }}
           OWNER: ${{ github.repository_owner }}
           AUTHOR: ${{ github.event.pull_request.user.login }}
           DRY_RUN: ${{ vars.ADMIT_DRY_RUN }}
@@ -105,14 +154,21 @@ jobs:
           set -euo pipefail
 
           # Auto-merge survives a force-push, so a pull request that was admitted and has
-          # since changed has to have it taken away again.
-          if [[ "$VERDICT" != "admit" ]]; then
+          # since changed has to have it taken away again — and so does one admitted while
+          # main still required the checks it would have merged on.
+          if [[ "$VERDICT" != "admit" || "$REQUIRED_OK" != "true" ]]; then
             gh pr merge "$PR" --disable-auto 2>/dev/null || true
           fi
 
           case "$VERDICT" in
             admit)
-              if [[ "$DRY_RUN" == "true" ]]; then
+              if [[ "$REQUIRED_OK" != "true" ]]; then
+                body="This submits a plugin and touches nothing else. Auto-merge is not being turned on, because what it would merge on is not what a submission is admitted on here:
+
+          ${REQUIRED_REASONS}
+
+          Nothing about this pull request is wrong, and nothing about it is yours to change. It waits."
+              elif [[ "$DRY_RUN" == "true" ]]; then
                 body="This submits a plugin and touches nothing else, so it would merge as soon as the checks pass. Auto-merge is not enabled yet: the gate is in dry run while it is watched."
               else
                 gh pr merge "$PR" --auto --squash
@@ -165,3 +221,12 @@ jobs:
           if [[ "$VERDICT" == "close" && "$AUTHOR" != "$OWNER" ]]; then
             gh pr close "$PR"
           fi
+
+      # After the comment, for the same reason. A submission held by the branch rather than by
+      # itself is nobody's to push a change to, so this is the one thing here that is red at
+      # the repository rather than at whoever opened the pull request.
+      - name: Say that the branch is where this stopped
+        if: steps.required.outputs.ok == 'false'
+        run: |
+          echo "::error::main does not require the checks a submission is admitted on. See .github/admit/required.json."
+          exit 1
