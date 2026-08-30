@@ -627,6 +627,13 @@ static void WriteCatalogue(List<PluginEntry> plugins, List<RuleSetEntry> ruleSet
         // the one fact worth carrying here that a plugin has no analogue of: it is what makes
         // a composite a composite, and a client listing rule sets can say so without fetching
         // every entry to find out.
+        //
+        // `inputs` is here for the reason the operations below are: it is the thing somebody
+        // arrives holding. A person looking for a component to hold is looking for a
+        // behaviour, and `grant` is to a rule set what `grid.ray` is to a vocabulary — a name
+        // out of somebody else's document with no way to know whose. The names of one release
+        // of one document are a handful of short strings, so carrying them here costs less
+        // than the round trip that would fetch them one entry at a time.
         writer.WritePropertyName("ruleSets");
         writer.WriteStartArray();
         foreach (RuleSetEntry ruleSet in ruleSets)
@@ -639,6 +646,21 @@ static void WriteCatalogue(List<PluginEntry> plugins, List<RuleSetEntry> ruleSet
             writer.WriteNumber("holds", newest?.Uses?.GetArrayLength() ?? 0);
             writer.WriteNumber("withheld", ruleSet.Versions.Count(static version => version.Withheld is not null));
             WriteOptional(writer, "description", ruleSet.Description);
+
+            // The newest indexed release's, for the reason the operations are: offering a name
+            // that was withdrawn two releases ago is worse than not offering it. A rule set
+            // with no indexed release offers none, and its page still records that they were.
+            writer.WritePropertyName("inputs");
+            if (newest?.Inputs is JsonElement inputs)
+            {
+                inputs.WriteTo(writer);
+            }
+            else
+            {
+                writer.WriteStartArray();
+                writer.WriteEndArray();
+            }
+
             writer.WriteEndObject();
         }
 

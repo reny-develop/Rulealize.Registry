@@ -1,0 +1,11 @@
+{
+  "$schema": "rulealize/registry/plugin/v1",
+  "id": "Acme.Vocab",
+  "namespace": "acme",
+  "prefix": null,
+  "admitted": "1.0.0",
+  "latest": "1.0.0",
+  "versions": [
+    { "version": "1.0.0", "operations": { "expression": ["acme.each", "acme.some"], "effect": [], "schema": [] } }
+  ]
+}
