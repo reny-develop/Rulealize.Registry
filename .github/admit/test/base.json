@@ -1,7 +1,10 @@
 {
-  "$schema": "rulealize/registry/ledger/submitted/v1",
+  "$schema": "rulealize/registry/ledger/submitted/v2",
   "plugins": [
     { "id": "Rulealize.Plugin.Arithmetic", "version": "1.0.0", "namespace": "math", "prefix": null },
     { "id": "Rulealize.Plugin.Binding", "version": "1.0.0", "namespace": "bind", "prefix": "@" }
+  ],
+  "ruleSets": [
+    { "id": "Rulealize.RuleSet.Approval", "version": "1.0.0" }
   ]
 }

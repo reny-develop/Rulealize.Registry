@@ -71,6 +71,22 @@ derived() {
 
 ledger() { jq -n --argjson plugins "[$(printf '%s,' "$@" | sed 's/,$//')]" '{ plugins: $plugins }'; }
 
+# ruleset <id> [version] — a rule set submission, which states a package and a version and
+# nothing else. There is no third field: the identifier IS the package identifier.
+ruleset() {
+    jq -nc --arg id "$1" --arg version "${2:-0.1.0}" '{ id: $id, version: $version }'
+}
+
+# document <id> [version] — one rule set as the ledger tool reads it out of the document
+document() {
+    jq -nc --arg id "$1" --arg version "${2:-0.1.0}" \
+        '{ id: $id, admitted: $version, requires: [], uses: [], inputs: ["submit"] }'
+}
+
+documents() {
+    jq -n --argjson ruleSets "[$(printf '%s,' "$@" | sed 's/,$//')]" '{ plugins: [], ruleSets: $ruleSets }'
+}
+
 # gate <name> <admit|close|fix> [reason] — the head submitted list on standard input.
 # "close" means it is not a submission at all; "fix" is the submitter's own, and neither
 # waits on anybody.
@@ -205,14 +221,58 @@ gate fixes-a-bad-version fix "three-part version" \
 gate fixes-a-bad-namespace fix "lowercase letters and digits" \
     <<<"$(jq --argjson e "$(submission Acme.Deploy.Rules Acme null)" "$insert" "$work/base.json")"
 
-gate fixes-nothing-added fix "adds no plugin" < "$work/base.json"
+gate fixes-nothing-added fix "adds nothing" < "$work/base.json"
 
 # A second line for a package already in the ledger. It states nothing new — the assembly it
 # names agrees with it, so declared.sh has nothing to refuse — and the catalogue would carry
 # the plugin twice.
-gate fixes-a-duplicate fix "one line per plugin" \
+gate fixes-a-duplicate fix "one line per package" \
     <<<"$(jq --argjson e "$(submission Rulealize.Plugin.Binding bind '"@"' 2.0.0)" \
         '.plugins = .plugins + [$e]' "$work/base.json")"
+
+# ── rule sets ──────────────────────────────────────────────────────────────────────
+#
+# The same gate, pointed at a second kind of entry. Everything about the shape of the pull
+# request is the rule it already was; what is new is an entry with two fields instead of four,
+# and the reason it has two is that a rule set's identifier is its package identifier — so
+# there is no second name here to hold to a format, to an order of its own, or to a reserved
+# list.
+
+rules=$(ruleset Acme.Rules.Approval)
+holds='.ruleSets = [$e] + .ruleSets'
+
+gate admits-a-rule-set admit <<<"$(jq --argjson e "$rules" "$holds" "$work/base.json")"
+
+# One pull request may add one of each. Neither list is the other's business and the gate
+# reads both the same way.
+gate admits-both-kinds admit \
+    <<<"$(jq --argjson p "$acme" --argjson r "$rules" \
+        '.plugins = [$p] + .plugins | .ruleSets = [$r] + .ruleSets' "$work/base.json")"
+
+gate fixes-a-rule-set-removal fix "removes or rewrites" \
+    <<<"$(jq '.ruleSets = []' "$work/base.json")"
+
+gate fixes-a-rule-set-out-of-order fix "identifier order" \
+    <<<"$(jq --argjson e "$rules" '.ruleSets = .ruleSets + [$e]' "$work/base.json")"
+
+gate fixes-a-rule-set-version fix "three-part version" \
+    <<<"$(jq --argjson e "$(ruleset Acme.Rules.Approval 1.0)" "$holds" "$work/base.json")"
+
+gate fixes-a-rule-set-duplicate fix "one line per package" \
+    <<<"$(jq --argjson e "$(ruleset Rulealize.RuleSet.Approval 2.0.0)" \
+        '.ruleSets = .ruleSets + [$e]' "$work/base.json")"
+
+# The identifier is not a second name, so writing one is not a shorter way of saying the same
+# thing — it is stating something this ledger does not record and would never check.
+gate fixes-a-stated-identifier fix "states more than a rule set entry holds" \
+    <<<"$(jq --argjson e "$(jq -nc '{ id: "Acme.Rules.Approval", version: "1.0.0", ruleSet: "approval" }')" \
+        "$holds" "$work/base.json")"
+
+# A package holding an assembly and a document under one identifier. The two entries would be
+# checked against each other's artifact, and at least one of them would be withheld daily.
+gate fixes-a-straddling-package fix "one or the other" \
+    <<<"$(jq --argjson p "$acme" --argjson r "$(ruleset Acme.Deploy.Rules)" \
+        '.plugins = [$p] + .plugins | .ruleSets = [$r] + .ruleSets' "$work/base.json")"
 
 gate fixes-broken-json fix "not valid JSON" <<<'{ "plugins": ['
 
@@ -278,6 +338,39 @@ declared refuses-a-reserved-namespace refuses \
     "$(jq -n --argjson p "[$(submission Str.Tools str null)]" '{ plugins: $p }')" \
     "$(ledger "$(derived Str.Tools str null)")" \
     "reserved namespace"
+
+# A rule set states two things and both are checked, which is the whole of it. Nothing here
+# has a reserved list to be refused against and nothing has a namespace to move, because the
+# identifier the document declares is the package identifier it was fetched by.
+held=$(jq -n --argjson r "[$(ruleset Acme.Rules.Approval)]" '{ plugins: [], ruleSets: $r }')
+
+declared agrees-with-its-document agrees "$held" "$(documents "$(document Acme.Rules.Approval)")"
+
+# The document renaming itself. A rule set published under one package and declaring another
+# identifier is unresolvable by anybody: `uses` names the identifier, and a fetch by it either
+# misses or returns a document that says something else.
+declared refuses-another-document-id refuses "$held" \
+    "$(documents "$(document approval)")" \
+    "was submitted, and no document of that name"
+
+declared refuses-a-second-document refuses "$held" \
+    "$(documents "$(document Acme.Rules.Approval)" "$(document Acme.Rules.Shift)")" \
+    "came out of the packages and was never submitted"
+
+# The package version and the document's own version, drifted apart. The fetch goes by the
+# first and every `uses` constraint is answered by the second, so a package resolvable at
+# 0.1.0 would satisfy `^0.2` and nothing would say why.
+declared refuses-a-drifted-document refuses "$held" \
+    "$(documents "$(document Acme.Rules.Approval 0.2.0)")" \
+    "and its document says 0.2.0"
+
+# Neither list is the other's evidence. A ledger holding both kinds is checked against a
+# derivation holding both, and an entry of one kind is never answered by the other.
+declared agrees-with-both-kinds agrees \
+    "$(jq -n --argjson p "[$one]" --argjson r "[$(ruleset Acme.Rules.Approval)]" \
+        '{ plugins: $p, ruleSets: $r }')" \
+    "$(jq -n --argjson p "[$(derived Acme.Deploy.Rules acme null)]" \
+        --argjson r "[$(document Acme.Rules.Approval)]" '{ plugins: $p, ruleSets: $r }')"
 
 echo
 echo "required:"

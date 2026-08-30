@@ -132,6 +132,58 @@ report $? "says there is no indexed release"
 [[ -z "$(ls -A "$work/all/op")" ]]
 report $? "offers no operation from a plugin with no indexed release"
 
+# 6. Rule sets. A composite's page has to answer the question somebody arrives with — what does
+# this hold, and can I get it — so the two halves worth checking are that a held rule set this
+# index can answer for is a link, and that one it cannot is not.
+mkdir -p "$work/ruleset"
+(cd "$root" && dotnet run --project tool/Site -c Release -- tool/Site/test/ruleset "$work/ruleset" > /dev/null 2>&1)
+report $? "renders a catalogue with rule sets in it"
+
+page="$work/ruleset/ruleset/Acme.Rules.Roster.html"
+
+grep -q 'href="Acme.Rules.Shift.html"' "$page"
+report $? "links a held rule set that is indexed"
+
+# The link that must not be written. `approval` is a name nothing here can answer for, and a
+# link to a page that does not exist would say the opposite of what is true.
+! grep -q 'href="approval.html"' "$page"
+report $? "does not link a held rule set that is not indexed"
+
+grep -q 'A held rule set that is not indexed here is one nothing can fetch' "$page"
+report $? "says what an unindexed held rule set means"
+
+# A vocabulary nobody publishes is a supported arrangement, so a `requires` naming one is
+# rendered rather than refused — and not linked, for the reason above.
+! grep -q 'href="../plugin/Acme.Deploy.Rules.html"' "$page"
+report $? "does not link a required plugin that is not indexed"
+
+grep -q '<code>assign</code>' "$page"
+report $? "lists the inputs a composite could constrain"
+
+component="$work/ruleset/ruleset/Acme.Rules.Shift.html"
+
+grep -q 'declares the identifier <code>shift</code>' "$component"
+report $? "says the identifier the withheld release declared"
+
+grep -q '<th>Latest</th><td><code>1.0.0</code>' "$component"
+report $? "reports the newest indexed release as the latest"
+
+grep -q '1 withheld' "$work/ruleset/index.html"
+report $? "marks the rule set on the front page"
+
+# The example a reader copies. `as` carries the short name, which is the whole reason a
+# package-shaped identifier costs a holding document nothing to write.
+grep -q '"as": "roster"' "$page"
+report $? "writes a uses example whose alias is short"
+
+[[ -f "$work/ruleset/ruleset/Acme.Rules.Roster.json" ]]
+report $? "publishes the entry beside the page"
+
+# 7. A catalogue from before rule sets were indexed. Every fixture above this one has no
+# `ruleSets` at all, and the front page has to say so rather than render an empty table.
+grep -q 'None yet' "$work/plain/index.html"
+report $? "says none rather than an empty table of rule sets"
+
 echo
 if [[ $failed -gt 0 ]]; then
     echo "$failed failed."

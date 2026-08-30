@@ -1,0 +1,22 @@
+{
+  "$schema": "rulealize/registry/index/v1",
+  "checked": "2026-08-30T04:00:00Z",
+  "plugins": [],
+  "ruleSets": [
+    {
+      "id": "Acme.Rules.Roster",
+      "latest": "1.0.0",
+      "holds": 2,
+      "withheld": 0,
+      "description": "A composite holding one indexed rule set and one that is not."
+    },
+    {
+      "id": "Acme.Rules.Shift",
+      "latest": "1.0.0",
+      "holds": 0,
+      "withheld": 1,
+      "description": "A component with one release the catalogue would not index."
+    }
+  ],
+  "operations": []
+}

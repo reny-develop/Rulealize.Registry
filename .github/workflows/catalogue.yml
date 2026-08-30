@@ -1,15 +1,16 @@
 # Builds the catalogue, and checks every published version against the ledger.
 #
-# The ledger holds one row per plugin because a claim is permanent; the catalogue holds one
-# entry per version because `requires` reads ^1.0 and an operation may be added within a
-# major. So a new version of a plugin already admitted needs no pull request: nothing
+# The ledger holds one row per package because a claim is permanent; the catalogue holds one
+# entry per version because `requires` and `uses` read ^1.0 and what a release offers may grow
+# within a major. So a new version of anything already admitted needs no pull request: nothing
 # committed changes and this run picks it up.
 #
 # Which is why this one IS scheduled, where the ledger's check is not. A release that nobody
-# submits is exactly what a schedule is for, and it is also the only way a plugin could
-# quietly change its namespace between versions — so the same run that finds the release
-# checks its claims against the ledger and withholds it from the index if they moved, on the
-# plugin's own page rather than in a log its publisher will never read.
+# submits is exactly what a schedule is for, and it is also the only way a package could
+# quietly rename itself between versions — a plugin moving its namespace, a rule set moving
+# the identifier its document declares. So the same run that finds the release checks it
+# against the ledger and withholds it from the index if it moved, on the entry's own page
+# rather than in a log its publisher will never read.
 
 name: catalogue
 
@@ -31,6 +32,7 @@ jobs:
       plugins: ${{ steps.counts.outputs.plugins }}
       versions: ${{ steps.counts.outputs.versions }}
       operations: ${{ steps.counts.outputs.operations }}
+      rulesets: ${{ steps.counts.outputs.rulesets }}
       withheld: ${{ steps.counts.outputs.withheld }}
 
     steps:
@@ -62,11 +64,19 @@ jobs:
         id: counts
         run: |
           set -euo pipefail
+
+          # find rather than a glob: the rule set folder is written on every run and is empty
+          # until somebody publishes one, and an unmatched glob is a failure rather than a zero.
+          versions=$(find catalogue/plugin catalogue/ruleset -name '*.json' -print0 \
+            | xargs -0 --no-run-if-empty cat \
+            | jq -s '[.[].versions | length] | add // 0')
+
           {
             echo "plugins=$(jq '.plugins | length' catalogue/index.json)"
             echo "operations=$(jq '.operations | length' catalogue/index.json)"
-            echo "versions=$(jq -s '[.[].versions | length] | add' catalogue/plugin/*.json)"
-            echo "withheld=$(jq '[.plugins[].withheld] | add // 0' catalogue/index.json)"
+            echo "rulesets=$(jq '(.ruleSets // []) | length' catalogue/index.json)"
+            echo "versions=${versions}"
+            echo "withheld=$(jq '[.plugins[].withheld, (.ruleSets // [])[].withheld] | add // 0' catalogue/index.json)"
           } >> "$GITHUB_OUTPUT"
 
       # Built on every run, including the ones that will not publish: a pull request, or any
@@ -135,6 +145,7 @@ jobs:
           PLUGINS: ${{ needs.build.outputs.plugins }}
           VERSIONS: ${{ needs.build.outputs.versions }}
           OPERATIONS: ${{ needs.build.outputs.operations }}
+          RULESETS: ${{ needs.build.outputs.rulesets }}
           WITHHELD: ${{ needs.build.outputs.withheld }}
         run: |
           set -euo pipefail
@@ -160,6 +171,7 @@ jobs:
             --arg plugins "${PLUGINS:-}" \
             --arg versions "${VERSIONS:-}" \
             --arg operations "${OPERATIONS:-}" \
+            --arg rulesets "${RULESETS:-}" \
             --arg withheld "${WITHHELD:-}" \
             'def num: if . == "" then null else tonumber end;
              {
@@ -169,6 +181,7 @@ jobs:
                plugins: ($plugins | num),
                versions: ($versions | num),
                operations: ($operations | num),
+               ruleSets: ($rulesets | num),
                withheld: ($withheld | num)
              }' >> log.jsonl
 

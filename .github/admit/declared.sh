@@ -2,11 +2,18 @@
 #
 # Holds a submission to what its package actually claims.
 #
-# A submission states four things — the package, the version, the namespace and the shorthand
-# character — and three of those are claims about an assembly nobody has loaded yet. This is
-# what loads it and compares. It is the reason a submission can be four fields rather than a
-# pasted ledger row: the operations are never stated, and the parts that are stated are not
+# A plugin submission states four things — the package, the version, the namespace and the
+# shorthand character — and three of those are claims about an assembly nobody has loaded yet.
+# A rule set submission states two, and one of them is a claim about a document nobody has
+# read. This is what loads the one, reads the other, and compares. It is the reason a
+# submission is a handful of fields rather than a pasted ledger row: the operations, the
+# inputs, the requires and the uses are never stated, and the parts that are stated are not
 # believed.
+#
+# The two kinds cost different things to check, and the difference is worth naming. A plugin's
+# claims are read by running its code. A rule set's are read by parsing JSON — nothing is
+# executed, which makes it the one thing indexed here that this repository does not have to
+# say "loading is running" about.
 #
 # It runs where the plugin's code runs, which is the job with no token and no secrets. The
 # gate that can merge never sees a package, and never runs one.
@@ -110,6 +117,43 @@ done < <(jq -r --slurpfile reserved "$reserved" '
         (select($plugin.prefix != null and ($plugin.prefix as $p | $reserved[0].prefixes | index($p)))
           | "`\($plugin.id)` claims the reserved shorthand character `\($plugin.prefix)`.") ]
     | .[]' "$derived")
+
+# ── rule sets ──────────────────────────────────────────────────────────────────────
+#
+# The same two comparisons and no others, because a rule set submission states no third thing.
+# A document declares one identifier and one version; the package was fetched by an identifier
+# at a version; and the whole of what is checked is that those are the same two strings.
+#
+# There is no reserved list for either. The identifier IS the package identifier, which
+# nuget.org allocated and no two publishers can hold — so unlike a namespace there is nothing
+# here that could be taken by declaring it, and nothing to refuse in advance.
+missing=$(jq -r --slurpfile derived "$derived" \
+    '[(.ruleSets // [])[].id] - [($derived[0].ruleSets // [])[].id] | .[]' "$submitted")
+extra=$(jq -r --slurpfile submitted "$submitted" \
+    '[(.ruleSets // [])[].id] - [($submitted[0].ruleSets // [])[].id] | .[]' "$derived")
+
+while IFS= read -r id; do
+    [[ -z "$id" ]] && continue
+    note "\`${id}\` was submitted, and no document of that name came out of the packages. A rule set is published under the identifier its document declares, and one package holds one document."
+done <<<"$missing"
+
+while IFS= read -r id; do
+    [[ -z "$id" ]] && continue
+    note "\`${id}\` came out of the packages and was never submitted. Its identifier is not one anybody claimed here."
+done <<<"$extra"
+
+while IFS= read -r entry; do
+    [[ -z "$entry" ]] && continue
+    id=$(jq -r '.id' <<<"$entry")
+    actual=$(jq -c --arg id "$id" '(.ruleSets // [])[] | select(.id == $id)' "$derived")
+    [[ -z "$actual" ]] && continue
+
+    said=$(jq -r '.version' <<<"$entry")
+    is=$(jq -r '.admitted' <<<"$actual")
+    if [[ "$said" != "$is" ]]; then
+        note "\`${id}\` was fetched at ${said}, and its document says ${is}. A \`uses\` constraint is answered by the version in the document, so raise that and the package version together."
+    fi
+done < <(jq -c '(.ruleSets // [])[]' "$submitted")
 
 if [[ ${#wrong[@]} -gt 0 ]]; then
     printf '%s\n' "${wrong[@]}"

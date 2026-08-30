@@ -1,5 +1,5 @@
 {
-  "$schema": "rulealize/registry/ledger/submitted/v1",
+  "$schema": "rulealize/registry/ledger/submitted/v2",
   "plugins": [
     { "id": "Rulealize.Plugin.Arithmetic", "version": "1.0.0", "namespace": "math", "prefix": null },
     { "id": "Rulealize.Plugin.Binding", "version": "1.0.0", "namespace": "bind", "prefix": "@" },
@@ -15,5 +15,8 @@
     { "id": "Rulealize.Plugin.State", "version": "1.0.0", "namespace": "state", "prefix": "$" },
     { "id": "Rulealize.Plugin.Tuple", "version": "1.0.0", "namespace": "tuple", "prefix": null },
     { "id": "Rulealize.Plugin.TypeSchema", "version": "1.1.0", "namespace": "type", "prefix": null }
+  ],
+  "ruleSets": [
+    { "id": "Rulealize.RuleSet.Request", "version": "1.0.0" }
   ]
 }

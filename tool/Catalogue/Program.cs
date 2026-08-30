@@ -11,24 +11,31 @@ using System.Text.Unicode;
 using System.Xml.Linq;
 
 // Builds the catalogue the site and the resolver are generated from, and checks every
-// published version against what the ledger says the plugin claims.
+// published version against what the ledger says was claimed.
 //
 //   dotnet run --project tool/Catalogue -- <ledger file> <probe> <output folder>
 //
-// The ledger is the one file a person reads: one line per plugin, holding the three things a
-// plugin claims and the version they were claimed at, because a claim is permanent and cannot
-// differ between versions. The catalogue is not reviewed by anybody and holds one entry per
-// version, because `requires` reads `^1.0` and an operation may be added within a major. That
-// difference is the whole reason these are two documents. Operations are in neither the
-// ledger nor a submission — they are read out of the assemblies, here.
+// Two kinds are indexed and both are crawled the same way. The ledger is the one file a
+// person reads: one line per package, holding what was claimed and the version it was claimed
+// at, because a claim is permanent and cannot differ between versions. The catalogue is not
+// reviewed by anybody and holds one entry per version, because `requires` and `uses` read
+// `^1.0` and what a release offers may grow within a major. That difference is the whole
+// reason these are two documents. Operations, inputs, requires and uses are in neither the
+// ledger nor a submission — they are read out of what was published, here.
 //
-// It follows that a new version of a plugin already in the ledger needs no pull request at
+// It follows that a new version of anything already in the ledger needs no pull request at
 // all: nothing committed changes, and the catalogue picks it up the next time this runs.
-// What that would otherwise let through is a plugin quietly changing its namespace between
-// versions, so this checks every version's claims against the ledger. One that says something
-// else is withheld: it stays in the entry, marked, carrying what it claimed, and nothing is
-// indexed off it — not its operations and not the plugin's `latest`. The policy that a claim
-// is permanent is enforced here, mechanically, while the file a human reads does not move.
+// What that would otherwise let through is a package quietly renaming itself between
+// versions, so this checks every version against the ledger. One that says something else is
+// withheld: it stays in the entry, marked, carrying what it claimed, and nothing is indexed
+// off it — not its operations and not its `latest`. The policy that a claim is permanent is
+// enforced here, mechanically, while the file a human reads does not move.
+//
+// For a plugin, what may move is the namespace or the shorthand character. For a rule set it
+// is the identifier the document declares and the version it declares, which are the package
+// identifier and the package version — a document that renames itself between releases is
+// unresolvable by every `uses` that named it, and this is the only party that sees it happen
+// before somebody's restore does.
 //
 // Withheld rather than fatal, because the publisher is the only party who can put it right
 // and a run that wrote nothing would tell everybody except them. What does stop this is the
@@ -38,6 +45,10 @@ using System.Xml.Linq;
 // <probe> is tool/Ledger, built. This tool loads no plugin itself — see the project file for
 // why it cannot — and runs that one per version instead, reading the JSON it writes to
 // standard output. Pass either the apphost or the .dll; a .dll is run through `dotnet`.
+//
+// A rule set needs none of that isolation: reading a document runs nothing, and one process
+// could hold a hundred of them. It goes through the same probe anyway, so that the registry
+// parses the format in exactly one place and that place is Rulealize's own reader.
 //
 // Prerelease versions are skipped and reported. A rule set's `requires` is written in three
 // constraint forms that all parse as System.Version, so no constraint can name a prerelease
@@ -139,6 +150,78 @@ foreach (JsonElement claim in ledger.RootElement.GetProperty("plugins").Enumerat
         + (withheld is 0 ? "" : $", {withheld} withheld"));
 }
 
+// The same crawl, over documents. An entry is two fields because a rule set claims one name
+// and that name is the package it is published under, so there is nothing here to compare
+// against a reserved list and nothing that could be true of one release and not another
+// except the two strings the document declares about itself.
+List<RuleSetEntry> documented = [];
+
+foreach (JsonElement claim in ledger.RootElement.TryGetProperty("ruleSets", out JsonElement submitted)
+    ? submitted.EnumerateArray()
+    : [])
+{
+    string id = claim.GetProperty("id").GetString()!;
+    string admitted = claim.GetProperty("version").GetString()!;
+
+    List<string> versions = await ReleasedVersions(id);
+    if (versions.Count is 0)
+    {
+        violations.Add(
+            $"{id}: nuget.org serves no released version of it. A package is fetched by the identifier "
+            + "the ledger records, so that is the identifier it has to be published under.");
+        continue;
+    }
+
+    List<RuleSetVersion> entries = [];
+    RuleSetPackage? indexed = null;
+
+    foreach (string version in versions)
+    {
+        RuleSetPackage package;
+        try
+        {
+            package = await FetchRuleSet(id, version);
+        }
+        catch (Exception failure) when (failure is not (HttpRequestException or TaskCanceledException))
+        {
+            // A package with no `ruleset` folder, with more than one document in it, or with
+            // one the probe would not read. It is one publisher's upload and it withholds one
+            // version, rather than the index everybody else is in.
+            Console.Error.WriteLine($"{id} {version} could not be read: {failure.Message}");
+            entries.Add(RuleSetVersion.Unreadable(version));
+            continue;
+        }
+
+        // `uses` names an identifier and a fetcher goes to the package of that name, so the
+        // two being one string is the whole of what makes a published rule set resolvable.
+        // A release where they part company is withheld, and what it said instead is recorded
+        // beside it — the publisher is the only party who can put it right.
+        if (package.Declared.Id != id || package.Declared.Admitted != Release(version))
+        {
+            Console.Error.WriteLine(
+                $"{id} {version} declares '{package.Declared.Id}' at {package.Declared.Admitted}, "
+                + $"where the ledger admitted '{id}'. A claim is permanent.");
+            entries.Add(RuleSetVersion.Moved(version, package.Declared));
+            continue;
+        }
+
+        indexed = package;
+        entries.Add(new RuleSetVersion(
+            version, package.Declared.Requires, package.Declared.Uses, package.Declared.Inputs, null, null));
+    }
+
+    RuleSetVersion? newest = entries.LastOrDefault(static entry => entry.Withheld is null);
+    int withheld = entries.Count(static entry => entry.Withheld is not null);
+
+    documented.Add(new RuleSetEntry(
+        id, admitted, newest?.Version,
+        indexed?.Description, indexed?.Repository, indexed?.License, entries));
+
+    Console.Error.WriteLine(
+        $"{id}: {entries.Count} version(s), latest {newest?.Version ?? "none indexed"}"
+        + (withheld is 0 ? "" : $", {withheld} withheld"));
+}
+
 if (violations.Count is not 0)
 {
     Console.Error.WriteLine();
@@ -150,8 +233,8 @@ if (violations.Count is not 0)
     return 1;
 }
 
-WriteCatalogue(catalogued, outputFolder);
-Console.Error.WriteLine($"{catalogued.Count} plugins → {outputFolder}");
+WriteCatalogue(catalogued, documented, outputFolder);
+Console.Error.WriteLine($"{catalogued.Count} plugins, {documented.Count} rule sets → {outputFolder}");
 return 0;
 
 // ── nuget.org ──────────────────────────────────────────────────────────────────────
@@ -232,6 +315,51 @@ async Task<Package> Fetch(string id, string version)
         Value(metadata, "license"));
 }
 
+// A rule set package is a package with no `lib` folder: what it distributes is a document,
+// and a document targets no framework and depends on no assembly. `ruleset/` at the root and
+// exactly one `.json` in it, because `uses` resolves an identifier to a package and a package
+// holding two documents would put a map back in the middle of that.
+async Task<RuleSetPackage> FetchRuleSet(string id, string version)
+{
+    string lower = id.ToLowerInvariant();
+    string url = $"{FlatContainer}/{lower}/{version}/{lower}.{version}.nupkg";
+
+    string folder = Path.Combine(scratch, $"{id}.{version}");
+    Directory.CreateDirectory(folder);
+
+    using ZipArchive archive = new(await http.GetStreamAsync(url));
+
+    ZipArchiveEntry[] documents =
+    [
+        .. archive.Entries.Where(static entry =>
+            entry.FullName.StartsWith("ruleset/", StringComparison.OrdinalIgnoreCase)
+            && entry.FullName.EndsWith(".json", StringComparison.OrdinalIgnoreCase)
+            && entry.FullName.Count(static character => character is '/') is 1)
+    ];
+
+    if (documents.Length is not 1)
+    {
+        throw new InvalidOperationException(
+            $"{id} {version} holds {documents.Length} documents in `ruleset`, and a rule set package holds one.");
+    }
+
+    documents[0].ExtractToFile(Path.Combine(folder, Path.GetFileName(documents[0].FullName)), overwrite: true);
+
+    ZipArchiveEntry nuspec = archive.Entries.Single(entry =>
+        !entry.FullName.Contains('/', StringComparison.Ordinal)
+        && entry.FullName.EndsWith(".nuspec", StringComparison.OrdinalIgnoreCase));
+
+    using Stream stream = nuspec.Open();
+    XElement metadata = XDocument.Load(stream).Root!.Elements()
+        .Single(element => element.Name.LocalName is "metadata");
+
+    return new RuleSetPackage(
+        ProbeRuleSet(folder),
+        Value(metadata, "description"),
+        Repository(metadata),
+        Value(metadata, "license"));
+}
+
 static string OneFramework(string id, string version, ZipArchive archive)
 {
     string[] frameworks = [.. archive.Entries
@@ -270,7 +398,7 @@ static string? Value(XElement metadata, string name) =>
 
 // ── the probe ──────────────────────────────────────────────────────────────────────
 
-Claimed Probe(string folder, string id)
+JsonElement Reported(string folder)
 {
     bool managed = probe.EndsWith(".dll", StringComparison.OrdinalIgnoreCase);
     ProcessStartInfo start = new()
@@ -300,7 +428,12 @@ Claimed Probe(string folder, string id)
     }
 
     using JsonDocument reported = JsonDocument.Parse(output);
-    JsonElement plugin = reported.RootElement.GetProperty("plugins").EnumerateArray()
+    return reported.RootElement.Clone();
+}
+
+Claimed Probe(string folder, string id)
+{
+    JsonElement plugin = Reported(folder).GetProperty("plugins").EnumerateArray()
         .Single(element => element.GetProperty("id").GetString() == id);
 
     JsonElement prefix = plugin.GetProperty("prefix");
@@ -310,11 +443,40 @@ Claimed Probe(string folder, string id)
         plugin.GetProperty("operations").Clone());
 }
 
+// Not selected by identifier, the way a plugin is. Which identifier the document declares is
+// the thing being checked, so asking the probe for one by name would be asking it to confirm
+// what it was told. The folder holds one document because the package did.
+Document ProbeRuleSet(string folder)
+{
+    JsonElement[] found = [.. Reported(folder).GetProperty("ruleSets").EnumerateArray()];
+
+    if (found.Length is not 1)
+    {
+        throw new InvalidOperationException($"The probe read {found.Length} rule sets out of '{folder}'.");
+    }
+
+    return new Document(
+        found[0].GetProperty("id").GetString()!,
+        found[0].GetProperty("admitted").GetString()!,
+        found[0].GetProperty("requires").Clone(),
+        found[0].GetProperty("uses").Clone(),
+        found[0].GetProperty("inputs").Clone());
+}
+
+// The feed's version string, written the way the probe writes a document's own. nuget.org
+// normalises most of what it serves, and a package published as 1.0.0.0 would otherwise read
+// as a document disagreeing with its package about a component neither of them uses.
+static string Release(string version) =>
+    Version.TryParse(version, out Version? parsed)
+        ? new Version(parsed.Major, parsed.Minor, Math.Max(parsed.Build, 0)).ToString()
+        : version;
+
 // ── output ─────────────────────────────────────────────────────────────────────────
 
-static void WriteCatalogue(List<PluginEntry> plugins, string folder)
+static void WriteCatalogue(List<PluginEntry> plugins, List<RuleSetEntry> ruleSets, string folder)
 {
     Directory.CreateDirectory(Path.Combine(folder, "plugin"));
+    Directory.CreateDirectory(Path.Combine(folder, "ruleset"));
 
     foreach (PluginEntry plugin in plugins)
     {
@@ -371,6 +533,64 @@ static void WriteCatalogue(List<PluginEntry> plugins, string folder)
         });
     }
 
+    // One rule set, every released version, and what each of them draws on and holds. The
+    // three lists are what a resolver could not work out without fetching the package — which
+    // is the round trip this file exists to save, and it saves it once per version rather
+    // than once per document in a graph nobody can see the shape of yet.
+    foreach (RuleSetEntry ruleSet in ruleSets)
+    {
+        Write(Path.Combine(folder, "ruleset", $"{ruleSet.Id}.json"), writer =>
+        {
+            writer.WriteStartObject();
+            writer.WriteString("$schema", "rulealize/registry/ruleset/v1");
+            writer.WriteString("id", ruleSet.Id);
+            writer.WriteString("admitted", ruleSet.Admitted);
+            WriteOptional(writer, "latest", ruleSet.Latest);
+            WriteOptional(writer, "description", ruleSet.Description);
+            WriteOptional(writer, "repository", ruleSet.Repository);
+            WriteOptional(writer, "license", ruleSet.License);
+
+            writer.WritePropertyName("versions");
+            writer.WriteStartArray();
+            foreach (RuleSetVersion version in ruleSet.Versions)
+            {
+                writer.WriteStartObject();
+                writer.WriteString("version", version.Version);
+
+                if (version.Withheld is string withheld)
+                {
+                    writer.WriteString("withheld", withheld);
+
+                    // What the document said about itself instead. The identifier this entry
+                    // is filed under is elsewhere in this same file, so a page can show both
+                    // without being told either.
+                    if (version.Claimed is Document claimed)
+                    {
+                        writer.WritePropertyName("claimed");
+                        writer.WriteStartObject();
+                        writer.WriteString("id", claimed.Id);
+                        writer.WriteString("version", claimed.Admitted);
+                        writer.WriteEndObject();
+                    }
+                }
+                else
+                {
+                    writer.WritePropertyName("requires");
+                    version.Requires!.Value.WriteTo(writer);
+                    writer.WritePropertyName("uses");
+                    version.Uses!.Value.WriteTo(writer);
+                    writer.WritePropertyName("inputs");
+                    version.Inputs!.Value.WriteTo(writer);
+                }
+
+                writer.WriteEndObject();
+            }
+
+            writer.WriteEndArray();
+            writer.WriteEndObject();
+        });
+    }
+
     // One file the whole site searches, because the data set is bounded: a few hundred
     // operations is smaller than the round trip that would fetch them one at a time.
     Write(Path.Combine(folder, "index.json"), writer =>
@@ -398,6 +618,27 @@ static void WriteCatalogue(List<PluginEntry> plugins, string folder)
             // can say so without fetching every entry to count them.
             writer.WriteNumber("withheld", plugin.Versions.Count(static version => version.Withheld is not null));
             WriteOptional(writer, "description", plugin.Description);
+            writer.WriteEndObject();
+        }
+
+        writer.WriteEndArray();
+
+        // Every rule set in summary, in the same shape and for the same reason. `holds` is
+        // the one fact worth carrying here that a plugin has no analogue of: it is what makes
+        // a composite a composite, and a client listing rule sets can say so without fetching
+        // every entry to find out.
+        writer.WritePropertyName("ruleSets");
+        writer.WriteStartArray();
+        foreach (RuleSetEntry ruleSet in ruleSets)
+        {
+            RuleSetVersion? newest = ruleSet.Versions.LastOrDefault(static version => version.Withheld is null);
+
+            writer.WriteStartObject();
+            writer.WriteString("id", ruleSet.Id);
+            WriteOptional(writer, "latest", ruleSet.Latest);
+            writer.WriteNumber("holds", newest?.Uses?.GetArrayLength() ?? 0);
+            writer.WriteNumber("withheld", ruleSet.Versions.Count(static version => version.Withheld is not null));
+            WriteOptional(writer, "description", ruleSet.Description);
             writer.WriteEndObject();
         }
 
@@ -521,3 +762,47 @@ internal sealed record PluginEntry(
     string? Repository,
     string? License,
     List<VersionEntry> Versions);
+
+// What a rule set document declares about itself, and the whole of what a release is held to.
+// Two strings: an identifier, which is the package it must be published under, and a version,
+// which is what every `uses` constraint naming it is answered by.
+internal sealed record Document(
+    string Id,
+    string Admitted,
+    JsonElement Requires,
+    JsonElement Uses,
+    JsonElement Inputs);
+
+internal sealed record RuleSetPackage(
+    Document Declared,
+    string? Description,
+    string? Repository,
+    string? License);
+
+// Requires, uses and inputs are there when the version is in the index, and Withheld says so
+// when it is not: "claims" for one whose document declares an identifier or a version that is
+// not the package's, with Claimed carrying what it said instead, and "unreadable" for one no
+// document could be read out of.
+internal sealed record RuleSetVersion(
+    string Version,
+    JsonElement? Requires,
+    JsonElement? Uses,
+    JsonElement? Inputs,
+    string? Withheld,
+    Document? Claimed)
+{
+    internal static RuleSetVersion Unreadable(string version) =>
+        new(version, null, null, null, "unreadable", null);
+
+    internal static RuleSetVersion Moved(string version, Document declared) =>
+        new(version, null, null, null, "claims", declared);
+}
+
+internal sealed record RuleSetEntry(
+    string Id,
+    string Admitted,
+    string? Latest,
+    string? Description,
+    string? Repository,
+    string? License,
+    List<RuleSetVersion> Versions);

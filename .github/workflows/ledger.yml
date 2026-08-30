@@ -1,11 +1,14 @@
-# Fetches the packages the ledger names, loads them, and holds every entry to what its
+# Fetches the packages the ledger names, reads them, and holds every entry to what its
 # package actually claims.
 #
-# A submission states four things: a package, a version, a namespace and a shorthand
+# A plugin submission states four things: a package, a version, a namespace and a shorthand
 # character. Three of those are claims about an assembly, and this is the job that loads it
-# and finds out. The operations are stated nowhere — nobody keeps a list of them in step with
-# a release, and nobody can get one wrong — because they are read out of the assembly here and
-# published by the catalogue, which is derived on every run and committed nowhere.
+# and finds out. A rule set submission states two, and one of them is a claim about a document
+# — read here without running anything, which is the whole difference between the two kinds.
+# The operations, the inputs, the requires and the uses are stated nowhere — nobody keeps a
+# list of any of them in step with a release, and nobody can get one wrong — because they are
+# read out of what was published here and served by the catalogue, which is derived on every
+# run and committed nowhere.
 #
 # That is also why nothing is written back. The only file in git is the one a person reads and
 # a person wrote; everything derived from it is served from the site, rebuilt on every run and
@@ -45,11 +48,11 @@ jobs:
         with:
           dotnet-version: '10.0.x'
 
-      # One project referencing exactly the packages the ledger names, published so that the
-      # assemblies land in one folder. What else lands there does not matter: LoadPluginsFrom
-      # sweeps a folder and passes over assemblies with no plugin in them, which is why
-      # pointing it at an application's own output is a reasonable thing to do.
-      - name: Fetch the packages the ledger names
+      # One project referencing exactly the plugin packages the ledger names, published so that
+      # the assemblies land in one folder. What else lands there does not matter:
+      # LoadPluginsFrom sweeps a folder and passes over assemblies with no plugin in them,
+      # which is why pointing it at an application's own output is a reasonable thing to do.
+      - name: Fetch the plugin packages the ledger names
         run: |
           set -euo pipefail
           mkdir -p work
@@ -59,13 +62,54 @@ jobs:
             dotnet add work/Fetch package "${id}" --version "${version}"
             echo "::endgroup::"
           done
-          dotnet publish work/Fetch -c Release -o work/plugin
+          dotnet publish work/Fetch -c Release -o work/claimed
+
+      # A rule set package carries no assembly, so `dotnet publish` has nothing to copy out of
+      # one. It is fetched and unzipped instead, which is the same two operations with the
+      # framework's part left out — and it lands in the same folder, because the probe reads
+      # one folder and a deployment holds both kinds in one place too.
+      #
+      # The document is renamed to the package it came out of. It is a rule set's identifier
+      # that has one owner, not its file name, so two packages may both ship `rules.json` and
+      # neither is wrong — and the identifier inside is exactly what is being checked, so it
+      # cannot be what the file is named by here.
+      - name: Fetch the rule set packages the ledger names
+        run: |
+          set -euo pipefail
+          feed=https://api.nuget.org/v3-flatcontainer
+          jq -r '(.ruleSets // [])[] | "\(.id) \(.version)"' ledger/submitted.json | while read -r id version; do
+            echo "::group::${id} ${version}"
+            lower=$(tr '[:upper:]' '[:lower:]' <<<"$id")
+            curl -sSfL -o "work/${id}.nupkg" "${feed}/${lower}/${version}/${lower}.${version}.nupkg"
+
+            rm -rf work/one && mkdir -p work/one
+
+            # -C matches the folder without regard to case, because the catalogue does and the
+            # two have to agree. A package that is indexed daily and cannot be admitted here is
+            # worse than either answer would have been on its own.
+            #
+            # A failure is swallowed, because unzip's is "no matching files" — which is what the
+            # count below says, and says better: with a package identifier and a version in it.
+            unzip -o -j -C "work/${id}.nupkg" 'ruleset/*.json' -d work/one || true
+
+            # One package, one document. `uses` resolves an identifier to a package, so a
+            # package holding two would put a map back in the middle of that.
+            found=$(find work/one -name '*.json' | wc -l)
+            if [[ "$found" -ne 1 ]]; then
+              echo "::error file=ledger/submitted.json::${id} ${version} holds ${found} documents in \`ruleset\`, and a rule set package holds one."
+              exit 1
+            fi
+
+            mv work/one/*.json "work/claimed/${id}.json"
+            echo "::endgroup::"
+          done
 
       # A folder whose plugins cannot be loaded together is a collision, and the tool reports
-      # it as itself. Moving that check to before both plugins are published is the one thing
-      # about this repository that could not have been added later.
+      # it as itself. So is a folder where two documents declare one identifier. Moving either
+      # check to before both were published is the one thing about this repository that could
+      # not have been added later.
       - name: Read what the packages claim
-        run: dotnet run --project tool/Ledger -- work/plugin work/claim.json
+        run: dotnet run --project tool/Ledger -- work/claimed work/claim.json
 
       - name: Hold every entry to its package
         run: |
@@ -88,13 +132,14 @@ jobs:
           # here a new one. That is true of the pull request that introduces the file, and it
           # is the right answer for any other branch that has not got it yet.
           git show "origin/${BASE}:ledger/submitted.json" > work/base.json 2>/dev/null \
-            || echo '{ "plugins": [] }' > work/base.json
+            || echo '{ "plugins": [], "ruleSets": [] }' > work/base.json
 
           added=$(jq -r --slurpfile base work/base.json \
-            '[.plugins[].id] - [$base[0].plugins[].id] | .[]' ledger/submitted.json)
+            '[.plugins[].id, (.ruleSets // [])[].id]
+             - [$base[0].plugins[].id, ($base[0].ruleSets // [])[].id] | .[]' ledger/submitted.json)
 
           if [[ -z "$added" ]]; then
-            echo "This submits no plugin." >> "$GITHUB_STEP_SUMMARY"
+            echo "This submits nothing." >> "$GITHUB_STEP_SUMMARY"
             exit 0
           fi
 
@@ -103,6 +148,7 @@ jobs:
             echo
             echo '```json'
             jq --argjson ids "$(jq -R . <<<"$added" | jq -s .)" \
-              '{ plugins: [.plugins[] | select(.id as $i | $ids | index($i))] }' work/claim.json
+              '{ plugins: [.plugins[] | select(.id as $i | $ids | index($i))],
+                 ruleSets: [(.ruleSets // [])[] | select(.id as $i | $ids | index($i))] }' work/claim.json
             echo '```'
           } >> "$GITHUB_STEP_SUMMARY"

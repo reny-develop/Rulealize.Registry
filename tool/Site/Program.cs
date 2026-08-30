@@ -37,6 +37,7 @@ string output = args[1];
 Directory.CreateDirectory(output);
 Directory.CreateDirectory(Path.Combine(output, "plugin"));
 Directory.CreateDirectory(Path.Combine(output, "op"));
+Directory.CreateDirectory(Path.Combine(output, "ruleset"));
 
 using JsonDocument index = JsonDocument.Parse(await File.ReadAllTextAsync(Path.Combine(catalogue, "index.json")));
 
@@ -96,6 +97,58 @@ foreach (JsonElement summary in index.RootElement.GetProperty("plugins").Enumera
     File.Copy(path, Path.Combine(output, "plugin", $"{id}.json"), overwrite: true);
 }
 
+List<RuleSet> ruleSets = [];
+foreach (JsonElement summary in index.RootElement.TryGetProperty("ruleSets", out JsonElement listed)
+    ? listed.EnumerateArray()
+    : [])
+{
+    string id = summary.GetProperty("id").GetString()!;
+    string path = Path.Combine(catalogue, "ruleset", $"{id}.json");
+
+    using JsonDocument detail = JsonDocument.Parse(await File.ReadAllTextAsync(path));
+    JsonElement root = detail.RootElement;
+
+    List<RuleSetRelease> releases = [];
+    foreach (JsonElement release in root.GetProperty("versions").EnumerateArray())
+    {
+        // A release the catalogue withheld has none of the three, because what it declared
+        // about itself is not what the ledger admits and nothing is indexed off it.
+        List<Needs> requires = [.. Entries(release, "requires").Select(static entry =>
+            new Needs(entry.GetProperty("plugin").GetString()!, Text(entry, "version")))];
+
+        List<Held> uses = [.. Entries(release, "uses").Select(static entry =>
+            new Held(
+                entry.GetProperty("ruleSet").GetString()!,
+                Text(entry, "version"),
+                Text(entry, "as") ?? entry.GetProperty("ruleSet").GetString()!))];
+
+        List<string> inputs = [.. Entries(release, "inputs").Select(static input => input.GetString()!)];
+
+        Declared? claimed = release.TryGetProperty("claimed", out JsonElement said)
+            ? new Declared(Text(said, "id"), Text(said, "version"))
+            : null;
+
+        releases.Add(new RuleSetRelease(
+            release.GetProperty("version").GetString()!,
+            requires,
+            uses,
+            inputs,
+            Text(release, "withheld"),
+            claimed));
+    }
+
+    ruleSets.Add(new RuleSet(
+        id,
+        root.GetProperty("admitted").GetString()!,
+        Text(root, "latest"),
+        Text(root, "description"),
+        Text(root, "repository"),
+        Text(root, "license"),
+        releases));
+
+    File.Copy(path, Path.Combine(output, "ruleset", $"{id}.json"), overwrite: true);
+}
+
 // An operation name becomes a file name and a URL below. The runtime qualifies it with the
 // registering plugin's namespace and does not police the rest of it, so nothing upstream of
 // here makes `op` a name rather than a path. They are all checked before anything is written,
@@ -117,13 +170,16 @@ if (malformed.Length is not 0)
     return 1;
 }
 
-// The other string that becomes a path here. nuget.org allows nothing else in an identifier
-// and the ledger is fetched by it, so this is the belt to that brace.
+// The other string that becomes a path here, for both kinds. nuget.org allows nothing else in
+// an identifier and both ledgers are fetched by it, so this is the belt to that brace — and
+// for a rule set it is the whole of the check, because its identifier IS its package
+// identifier and there is no second name to hold to anything.
 string[] impossible =
 [
-    .. plugins
-        .Select(static plugin => plugin.Id)
+    .. plugins.Select(static plugin => plugin.Id)
+        .Concat(ruleSets.Select(static ruleSet => ruleSet.Id))
         .Where(static id => id.Length is 0 || !id.All(static c => char.IsAsciiLetterOrDigit(c) || c is '.' or '_' or '-'))
+        .Distinct(StringComparer.Ordinal)
         .Order(StringComparer.Ordinal),
 ];
 
@@ -136,11 +192,26 @@ if (impossible.Length is not 0)
 File.Copy(Path.Combine(catalogue, "index.json"), Path.Combine(output, "index.json"), overwrite: true);
 
 await File.WriteAllTextAsync(Path.Combine(output, "style.css"), Style, new UTF8Encoding(false));
-await WriteFront(plugins, output);
+await WriteFront(plugins, ruleSets, output);
 
 foreach (Plugin plugin in plugins)
 {
     await Write(Path.Combine(output, "plugin", $"{plugin.Id}.html"), plugin.Id, "..", PluginBody(plugin));
+}
+
+// Which identifiers this index can answer for. A `uses` entry naming one that is not here is
+// rendered as the text it is, with what that means said once on the page: the document is
+// published and the thing it holds is not, so nothing can restore it but its author.
+HashSet<string> indexed = [.. ruleSets.Select(static ruleSet => ruleSet.Id)];
+HashSet<string> vocabularies = [.. plugins.Select(static plugin => plugin.Id)];
+
+foreach (RuleSet ruleSet in ruleSets)
+{
+    await Write(
+        Path.Combine(output, "ruleset", $"{ruleSet.Id}.html"),
+        ruleSet.Id,
+        "..",
+        RuleSetBody(ruleSet, indexed, vocabularies));
 }
 
 // One page per operation, over the latest indexed release of each plugin — a name withdrawn
@@ -164,13 +235,20 @@ foreach (Plugin plugin in plugins)
     }
 }
 
-Console.Error.WriteLine($"{plugins.Count} plugins, {written} operations -> {output}");
+Console.Error.WriteLine($"{plugins.Count} plugins, {written} operations, {ruleSets.Count} rule sets -> {output}");
 return 0;
 
 static string? Text(JsonElement element, string name) =>
     element.TryGetProperty(name, out JsonElement value) && value.ValueKind is JsonValueKind.String
         ? value.GetString()
         : null;
+
+// A withheld release carries none of the three lists, and an older catalogue may carry none
+// of them at all. Both read as empty rather than as a missing key nothing handles.
+static IEnumerable<JsonElement> Entries(JsonElement element, string name) =>
+    element.TryGetProperty(name, out JsonElement value) && value.ValueKind is JsonValueKind.Array
+        ? value.EnumerateArray()
+        : [];
 
 // Everything that reaches a page goes through this. What comes out of the catalogue is a
 // publisher's prose, and a registry that renders it unescaped is a registry that lets one
@@ -249,6 +327,7 @@ static async Task Write(string path, string title, string root, string body) =>
         <footer>
         <a href="https://github.com/reny-develop/Rulealize.Registry">Repository</a>
         <a href="https://github.com/reny-develop/Rulealize.Registry/blob/main/doc/policy.md">Grant policy</a>
+        <a href="https://github.com/reny-develop/Rulealize.Registry/blob/main/doc/publish.md">Publishing</a>
         <a href="https://github.com/reny-develop/Rulealize.Registry/blob/main/ledger/submitted.json">Ledger</a>
         <a href="https://github.com/reny-develop/Rulealize">Rulealize</a>
         {(CheckedAt is null ? "" : $"<span class=\"checked\">Last checked {H(Day(CheckedAt))}</span>")}
@@ -390,6 +469,180 @@ static string Withheld(Plugin plugin, Release release, string reason)
         prefix is null ? "no shorthand character" : $"the shorthand character <code>{H(prefix)}</code>";
 }
 
+static string RuleSetBody(RuleSet ruleSet, HashSet<string> indexed, HashSet<string> vocabularies)
+{
+    StringBuilder body = new();
+    body.Append($"<h1>{H(ruleSet.Id)}</h1>");
+
+    if (ruleSet.Description is not null)
+    {
+        body.Append($"<p class=\"lede\">{H(ruleSet.Description)}</p>");
+    }
+
+    body.Append("<table class=\"facts\">");
+    body.Append(
+        $"<tr><th>Latest</th><td>{(ruleSet.Latest is null ? "<span class=\"none\">none indexed</span>" : $"<code>{H(ruleSet.Latest)}</code>")}</td></tr>");
+    body.Append($"<tr><th>Admitted at</th><td><code>{H(ruleSet.Admitted)}</code></td></tr>");
+    body.Append(
+        $"<tr><th>Holds</th><td>{(ruleSet.Indexed is { Uses.Count: > 0 } holding ? $"{holding.Uses.Count}" : "<span class=\"none\">nothing</span>")}</td></tr>");
+
+    if (ruleSet.License is not null)
+    {
+        body.Append($"<tr><th>Licence</th><td>{H(ruleSet.License)}</td></tr>");
+    }
+
+    if (ruleSet.Repository is not null)
+    {
+        body.Append(Link(ruleSet.Repository) is string source
+            ? $"<tr><th>Source</th><td><a href=\"{H(source)}\">{H(source)}</a></td></tr>"
+            : $"<tr><th>Source</th><td>{H(ruleSet.Repository)}</td></tr>");
+    }
+
+    body.Append(
+        $"<tr><th>Package</th><td><a href=\"https://www.nuget.org/packages/{H(ruleSet.Id)}\">nuget.org</a></td></tr>");
+    body.Append($"<tr><th>Entry</th><td><a href=\"{H(ruleSet.Id)}.json\">{H(ruleSet.Id)}.json</a></td></tr>");
+    body.Append("</table>");
+
+    body.Append("<h2>Hold it</h2>");
+    body.Append($$"""
+        <pre><code>"uses": [
+          { "ruleSet": "{{H(ruleSet.Id)}}", "version": "^{{H(Major(ruleSet.Latest))}}", "as": "{{H(Alias(ruleSet.Id))}}" }
+        ]</code></pre>
+        """);
+    body.Append(
+        "<p>The identifier is the package identifier, so nothing has to look it up. <code>as</code> is "
+        + "the short name the holding document calls it by, and it is what qualifies this rule set's "
+        + "inputs inside that one — <strong>and it is not optional</strong>. An alias defaults to the "
+        + "identifier and may not contain a <code>.</code>, so leaving it out is refused with a message "
+        + "about a key you did not write.</p>");
+
+    // Said here because this page is where somebody decides to hold it, and the next thing
+    // they want is the one command that makes the decision act.
+    body.Append(
+        "<p class=\"meta\">Getting what a <code>uses</code> names is the feed's job rather than this "
+        + "index's. <a href=\"https://github.com/reny-develop/Rulealize.Cli\"><code>rulealize "
+        + "restore</code></a> does it from 0.8.0 — the whole graph, into the folder the holding "
+        + "document resolves its components from — and takes the lowest version satisfying every "
+        + "constraint that named it, which is the rule a <code>requires</code> is resolved by.</p>");
+
+    foreach (RuleSetRelease release in ruleSet.Releases.AsEnumerable().Reverse())
+    {
+        body.Append($"<h2>{H(release.Version)}");
+        if (release.Withheld is not null)
+        {
+            body.Append(" <span class=\"warn\">not indexed</span>");
+        }
+
+        body.Append("</h2>");
+
+        // The one thing on these pages addressed to the rule set's author rather than to
+        // somebody about to hold it.
+        if (release.Withheld is string withheld)
+        {
+            body.Append($"<p class=\"withheld\">{WithheldDocument(ruleSet, release, withheld)}</p>");
+            continue;
+        }
+
+        if (release.Uses.Count is not 0)
+        {
+            body.Append("<h3>holds</h3><ul class=\"ops\">");
+            foreach (Held held in release.Uses)
+            {
+                string named = $"{H(held.RuleSet)}{(held.Version is null ? "" : $" {H(held.Version)}")}";
+
+                // An identifier this index cannot answer for. Said as text rather than as a
+                // link that would 404, and counted below so the page says it once plainly.
+                body.Append(indexed.Contains(held.RuleSet)
+                    ? $"<li><a href=\"{H(held.RuleSet)}.html\"><code>{named}</code></a> as <code>{H(held.Alias)}</code></li>"
+                    : $"<li><code>{named}</code> as <code>{H(held.Alias)}</code> <span class=\"warn\">not indexed</span></li>");
+            }
+
+            body.Append("</ul>");
+
+            if (release.Uses.Any(held => !indexed.Contains(held.RuleSet)))
+            {
+                body.Append(
+                    "<p class=\"meta\">A held rule set that is not indexed here is one nothing can fetch. "
+                    + "It may be a document its author keeps beside this one, in which case holding it is "
+                    + "correct and publishing this was premature — or it may be a name that never resolves.</p>");
+            }
+        }
+
+        if (release.Requires.Count is not 0)
+        {
+            body.Append("<h3>requires</h3><ul class=\"ops\">");
+            foreach (Needs needs in release.Requires)
+            {
+                string named = $"{H(needs.Plugin)}{(needs.Version is null ? "" : $" {H(needs.Version)}")}";
+                body.Append(vocabularies.Contains(needs.Plugin)
+                    ? $"<li><a href=\"../plugin/{H(needs.Plugin)}.html\"><code>{named}</code></a></li>"
+                    : $"<li><code>{named}</code></li>");
+            }
+
+            body.Append("</ul>");
+        }
+
+        if (release.Inputs.Count is not 0)
+        {
+            // What a composite writes in `held` and in `fires`, which is the one thing
+            // somebody has to know about this document before they can hold it.
+            body.Append("<h3>inputs</h3><ul class=\"ops\">");
+            foreach (string input in release.Inputs)
+            {
+                body.Append($"<li><code>{H(input)}</code></li>");
+            }
+
+            body.Append("</ul>");
+        }
+    }
+
+    return body.ToString();
+}
+
+// Why a release is not in the index. The identifier this entry is filed under is elsewhere on
+// the same page, so this is the half of the comparison that is nowhere else.
+static string WithheldDocument(RuleSet ruleSet, RuleSetRelease release, string reason)
+{
+    if (reason is not "claims" || release.Claimed is not Declared claimed)
+    {
+        return "Nothing could be read out of this release — no <code>ruleset</code> folder, more than one "
+            + "document in it, or one the reader refused — so it is not in the index.";
+    }
+
+    List<string> moved = [];
+    if (claimed.Id != ruleSet.Id)
+    {
+        moved.Add(
+            $"declares the identifier <code>{H(claimed.Id)}</code>, where the ledger admits "
+            + $"<code>{H(ruleSet.Id)}</code>");
+    }
+
+    if (claimed.Version is string version && version != release.Version)
+    {
+        moved.Add($"declares version <code>{H(version)}</code>, where the package is <code>{H(release.Version)}</code>");
+    }
+
+    if (moved.Count is 0)
+    {
+        moved.Add("declares something other than what the ledger admits");
+    }
+
+    return $"This release {string.Join(", and ", moved)}. A <code>uses</code> entry names an identifier and "
+        + "is answered by the version in the document, so nothing that named this could resolve to it — "
+        + "and a claim is permanent, so it is not in the index.";
+}
+
+// What a `uses` example writes. The latest indexed release's major, because that is what a
+// document holding this today would pin, and 1 where nothing is indexed to read one off.
+static string Major(string? latest) =>
+    Version.TryParse(latest, out Version? parsed) ? $"{parsed.Major}.{Math.Max(parsed.Minor, 0)}" : "1.0";
+
+// The short name a holder would reach for. `as` may not contain a dot, so a package-shaped
+// identifier cannot be its own alias — which is the whole reason `as` is not optional in
+// practice, and why the identifier being long costs a document one word.
+static string Alias(string id) =>
+    id.Split('.').LastOrDefault(static part => part.Length is not 0)?.ToLowerInvariant() ?? id;
+
 static string OperationBody(string op, string kind, Plugin plugin)
 {
     string[] carrying = [.. plugin.Releases
@@ -421,14 +674,15 @@ static string OperationBody(string op, string kind, Plugin plugin)
     return body.ToString();
 }
 
-static async Task WriteFront(List<Plugin> plugins, string output)
+static async Task WriteFront(List<Plugin> plugins, List<RuleSet> ruleSets, string output)
 {
     StringBuilder body = new();
 
-    body.Append("<h1>The Rulealize plugin index</h1>");
+    body.Append("<h1>The Rulealize index</h1>");
     body.Append("""
         <p class="lede">Which plugin provides an operation, which versions satisfy a rule set's
-        <code>requires</code>, and which namespaces and shorthand characters are already spoken for.</p>
+        <code>requires</code>, which namespaces and shorthand characters are already spoken for,
+        and which published rule sets a <code>uses</code> can name.</p>
         """);
 
     body.Append("""
@@ -500,13 +754,64 @@ static async Task WriteFront(List<Plugin> plugins, string output)
         is refused, and the two things worth knowing first</a>.</p>
         """);
 
+    body.Append("<h2>Published rule sets</h2>");
+    body.Append("""
+        <p>A rule set's <code>uses</code> names the documents it holds, by the identifier each one
+        declares. That identifier is the package identifier, so nothing has to resolve one to the
+        other — this table is here to say which documents exist, what each of them holds, and what
+        it would cost to hold one, rather than to answer a question a fetcher could not.</p>
+        """);
+
+    if (ruleSets.Count is 0)
+    {
+        // A table with no rows says less than a sentence does, and this is the state the index
+        // is in until somebody publishes the first one.
+        body.Append("""
+            <p class="meta">None yet. A rule set is published as a package whose <code>ruleset</code>
+            folder holds one document, and it is submitted the way a plugin is — one line naming the
+            package and the version its document was read at.
+            <a href="https://github.com/reny-develop/Rulealize.Registry/blob/main/doc/publish.md">What to
+            build</a>.</p>
+            """);
+    }
+    else
+    {
+        body.Append("<table class=\"claims\"><thead><tr>");
+        body.Append("<th>Rule set</th><th>Latest</th><th>Holds</th><th>Inputs</th>");
+        body.Append("</tr></thead><tbody>");
+
+        foreach (RuleSet ruleSet in ruleSets.OrderBy(static ruleSet => ruleSet.Id, StringComparer.Ordinal))
+        {
+            int withheld = ruleSet.Releases.Count(static release => release.Withheld is not null);
+
+            body.Append("<tr>");
+            body.Append($"<td><a href=\"ruleset/{H(ruleSet.Id)}.html\">{H(ruleSet.Id)}</a></td>");
+            body.Append(
+                $"<td>{(ruleSet.Latest is null ? "<span class=\"none\">—</span>" : $"<code>{H(ruleSet.Latest)}</code>")}");
+
+            if (withheld is not 0)
+            {
+                body.Append($" <span class=\"warn\">{withheld} withheld</span>");
+            }
+
+            body.Append("</td>");
+            body.Append($"<td class=\"n\">{ruleSet.Indexed?.Uses.Count ?? 0}</td>");
+            body.Append($"<td class=\"n\">{ruleSet.Indexed?.Inputs.Count ?? 0}</td>");
+            body.Append("</tr>");
+        }
+
+        body.Append("</tbody></table>");
+    }
+
     body.Append("""
         <h2>The files behind this page</h2>
-        <p>Nothing here is written by hand. Each entry is derived by loading the published package and
-        reading back what it registered, and these are the same files the resolver reads:</p>
+        <p>Nothing here is written by hand. Each entry is derived from the published package — a plugin
+        by loading it and reading back what it registered, a rule set by reading the document it
+        distributes — and these are the same files the resolver reads:</p>
         <ul>
-          <li><a href="index.json"><code>/index.json</code></a> — every plugin and operation, in summary</li>
-          <li><code>/plugin/&lt;id&gt;.json</code> — one plugin, every released version</li>
+          <li><a href="index.json"><code>/index.json</code></a> — every plugin, operation and rule set, in summary</li>
+          <li><code>/plugin/&lt;id&gt;.json</code> — one plugin, every released version, every operation of each</li>
+          <li><code>/ruleset/&lt;id&gt;.json</code> — one rule set, every released version, what each holds and requires</li>
         </ul>
         """);
 
@@ -577,6 +882,36 @@ internal sealed record Plugin(
 {
     /// <summary>The newest release the catalogue indexed, if it indexed any.</summary>
     internal Release? Indexed => Releases.LastOrDefault(static release => release.Withheld is null);
+}
+
+/// <summary>One entry of a rule set's <c>requires</c>: a vocabulary, and which versions will do.</summary>
+internal sealed record Needs(string Plugin, string? Version);
+
+/// <summary>One entry of a rule set's <c>uses</c>: a document it holds, and the name it calls it by.</summary>
+internal sealed record Held(string RuleSet, string? Version, string Alias);
+
+/// <summary>What a withheld release's document declared about itself instead.</summary>
+internal sealed record Declared(string? Id, string? Version);
+
+internal sealed record RuleSetRelease(
+    string Version,
+    List<Needs> Requires,
+    List<Held> Uses,
+    List<string> Inputs,
+    string? Withheld,
+    Declared? Claimed);
+
+internal sealed record RuleSet(
+    string Id,
+    string Admitted,
+    string? Latest,
+    string? Description,
+    string? Repository,
+    string? License,
+    List<RuleSetRelease> Releases)
+{
+    /// <summary>The newest release the catalogue indexed, if it indexed any.</summary>
+    internal RuleSetRelease? Indexed => Releases.LastOrDefault(static release => release.Withheld is null);
 }
 
 internal static partial class Program
