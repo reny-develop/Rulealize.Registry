@@ -87,6 +87,14 @@ a different package identifier cannot be admitted here and cannot be restored by
 
 **Vendor-qualify.** `Acme.Rules.Approval`, not `Approval`.
 
+**Write it exactly as the package is published.** The runtime matches a `uses` entry against
+the document supplied for it with an ordinal comparison, so `Acme.Rules.Approval` and
+`acme.rules.approval` are two rule sets. nuget.org does not agree — a package identifier is
+one string to it however it is cased, and the feed serves it lowercased either way — so this
+is a place where a fetch succeeds and the document that arrives is refused when it compiles.
+This registry compares exactly, for the same reason: a release whose document declares an
+identifier that is not, character for character, the one the ledger records is withheld.
+
 **One document per package.** The `ruleset` folder holds exactly one `.json`, and a package
 with none or with two is refused. An identifier that did not name a package would need
 something to turn it into one, and that something would have to be reachable before anybody
@@ -102,6 +110,17 @@ hundred times in a document that draws on it — and being short is what makes i
 governing with a reserved list. **An identifier is written once**, in the `uses` entry of each
 document that holds it, and `as` carries the name everything else uses. Inside the holder the
 rule set above is `req`: `req.raise` in `fires`, `$req.stage` in a guard, `req` in `held`.
+
+**Which is why `as` is written rather than defaulted.** An alias defaults to the identifier
+and may not contain a `.`, so a `uses` entry naming a package-shaped identifier and leaving
+`as` out is refused — with a message about a key the author did not write:
+
+```
+/uses[0]/as: must be a name without '.', which separates a held rule set from its input.
+```
+
+That is the whole of what a long identifier costs a holding document, and it is a short name
+that document wanted anyway: nothing reads better for having `Acme.Rules.Approval.raise` in it.
 
 So the identifier being long costs one word on one line, and what that buys is worth more:
 

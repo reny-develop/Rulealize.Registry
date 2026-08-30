@@ -512,7 +512,9 @@ static string RuleSetBody(RuleSet ruleSet, HashSet<string> indexed, HashSet<stri
     body.Append(
         "<p>The identifier is the package identifier, so nothing has to look it up. <code>as</code> is "
         + "the short name the holding document calls it by, and it is what qualifies this rule set's "
-        + "inputs inside that one.</p>");
+        + "inputs inside that one — <strong>and it is not optional</strong>. An alias defaults to the "
+        + "identifier and may not contain a <code>.</code>, so leaving it out is refused with a message "
+        + "about a key you did not write.</p>");
 
     // Said here because this page is where somebody decides to hold it, and a page that
     // implied the fetch already worked would be found out at the worst moment.

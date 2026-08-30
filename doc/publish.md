@@ -79,6 +79,14 @@ identifier, whatever fetches it asks nuget.org for that name, and the document t
 has to be the one that was named — the runtime refuses a component whose `id` is not what
 `uses` said, so a package where these differ resolves to nothing for anybody.
 
+**One string down to the case.** nuget.org does not care — a package identifier is one name to
+it however it is cased — but the runtime compares a `uses` entry against the document supplied
+for it exactly, so `Acme.Rules.Approval` and `acme.rules.approval` are two rule sets. A
+document whose `id` is your package with the casing changed still downloads — the feed
+lowercases the name either way — and then satisfies nobody's `uses`. It is withheld here for
+disagreeing with the line you submitted. Copy the identifier from one place to the other
+rather than typing it twice.
+
 **`Version`, and the `version` your document declares.** Also one string, and this one fails
 more quietly. The fetch goes by the package's version; every `uses` constraint is answered by
 the document's. A package published at `1.1.0` whose document still says `1.0.0` downloads

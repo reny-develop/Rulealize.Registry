@@ -203,9 +203,21 @@ the name meant. As it stands nothing has to: a document that holds this one writ
 ]
 ```
 
-and anything that can reach nuget.org can fetch what that names. `as` is the short name the
-holding document calls it by, and the one that qualifies its inputs — `req.raise`, never the
-identifier written out — so the identifier being long costs a document one word, once.
+and anything that can reach nuget.org can fetch what that names.
+
+**`as` is not optional here.** It is the short name the holding document calls it by and the
+one that qualifies its inputs — `req.raise`, never the identifier written out — and an alias
+may not contain a `.`, because that is what separates a held rule set from its input. An entry
+that leaves `as` out is asking for an alias that *is* the identifier, so a package-shaped one
+is refused:
+
+```
+/uses[0]/as: must be a name without '.', which separates a held rule set from its input.
+```
+
+The message names a key the document did not write, which is worth knowing before meeting it.
+So the identifier being long costs a holding document one word, once, and it is a word it was
+going to want anyway.
 
 **Fetching one asks nothing of this index.** A `uses` names a package, so getting what it
 names is the operation `rulealize restore` already performs for a `requires`, pointed at a
