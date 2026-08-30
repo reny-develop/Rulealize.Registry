@@ -242,9 +242,12 @@ the assembly exactly as an application does, and a submission carries a pointer 
 a description.
 
 The same holds of a document, and more plainly. A rule set is what the runtime will accept as
-one, its identifier and version are keys the core reserves, and its `requires` and `uses` are
-read here through Rulealize's own two readers — so nothing about an entry is this repository's
-reading of the format, and there is no field a publisher fills in about themselves.
+one; what it declares about itself is read here by `RuleSetIdentity.ReadFrom`, and what it
+draws on and holds by the two readers `requires` and `uses` already have — all of them
+Rulealize's, so an entry is what the runtime would say and not what this repository made of
+it. The one thing read out of the format here is the names of a document's inputs, which are
+the keys of a section the core reserves. There is no field a publisher fills in about
+themselves.
 
 **Nor a resolver.** Which versions are published and where the packages are is the feed's
 answer, and `rulealize restore` asks it directly — for a plugin today, and for a rule set on

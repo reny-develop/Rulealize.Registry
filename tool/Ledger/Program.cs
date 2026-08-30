@@ -20,17 +20,19 @@ using Rulealize.Abstraction.Plugin;
 // for the ledger to describe a plugin differently from the way an application loading that
 // same folder would see it.
 //
-// A rule set is a document, and reading one runs nothing at all. `id` and `version` are keys
-// the core reserves, so they are read as JSON; `requires` and `uses` are read through
-// Rulealize's own two readers, so that no constraint is parsed a second time by anything
-// downstream of this. That is the whole difference between the two kinds here, and it is why
-// a rule set costs a sweep what a plugin costs a process.
+// A rule set is a document, and reading one runs nothing at all. What it declares about itself
+// is `RuleSetIdentity.ReadFrom`, and what it draws on and holds is `PluginRequirement.ReadFrom`
+// and `RuleSetRequirement.ReadFrom` — all three Rulealize's, so that nothing about an entry is
+// this tool's reading of the format and no constraint is parsed a second time by anything
+// downstream. The input names are the exception, and they are the keys of one reserved section.
+// That is the whole difference between the two kinds here, and it is why a rule set costs a
+// sweep what a plugin costs a process.
 //
 // Which document answers to an identifier is read out of the document and never off its file
 // name, for the reason Rulealize.Cli reads a held rule set that way: a file may be renamed and
-// an identifier may not. A `.json` with no string `id` is passed over — a publish leaves its
-// deps and runtimeconfig in the same folder, and neither is a mistake to find — and one that
-// has an `id` is held to everything else.
+// an identifier may not. A `.json` the identity reader refuses is passed over — a publish
+// leaves its deps and runtimeconfig in the same folder, and neither is a mistake to find — and
+// one it accepts is held to everything else.
 //
 // Nothing it writes is committed anywhere. What it produces is compared — against the ledger
 // somebody wrote, by declared.sh, and against the previous version of the same thing, by
@@ -82,7 +84,7 @@ Dictionary<string, string> declaring = new(StringComparer.Ordinal);
 foreach (string path in Directory.EnumerateFiles(folder, "*.json")
     .OrderBy(static path => path, StringComparer.Ordinal))
 {
-    if (Readable(path) is not string text || Identifier(text) is not string id)
+    if (Readable(path) is not string text || Identity(text) is not RuleSetIdentity identity)
     {
         continue;
     }
@@ -91,9 +93,9 @@ foreach (string path in Directory.EnumerateFiles(folder, "*.json")
     // whichever the file system listed first would settle something no document said, and
     // settle it quietly — which is the collision this index exists to move earlier, met here
     // in the one place it can still be met loudly.
-    if (declaring.TryGetValue(id, out string? taken))
+    if (declaring.TryGetValue(identity.Id, out string? taken))
     {
-        Console.Error.WriteLine($"Two documents in '{folder}' declare '{id}':");
+        Console.Error.WriteLine($"Two documents in '{folder}' declare '{identity.Id}':");
         Console.Error.WriteLine($"  {taken}");
         Console.Error.WriteLine($"  {path}");
         return 1;
@@ -101,16 +103,16 @@ foreach (string path in Directory.EnumerateFiles(folder, "*.json")
 
     try
     {
-        ruleSets.Add(Read(id, text));
+        ruleSets.Add(Read(identity, text));
     }
     catch (Exception failure) when (failure is RuleSetBuildException or FormatException)
     {
-        Console.Error.WriteLine($"'{path}' declares '{id}' and cannot be read as a rule set.");
+        Console.Error.WriteLine($"'{path}' declares '{identity.Id}' and cannot be read as a rule set.");
         Console.Error.WriteLine(failure.Message);
         return 1;
     }
 
-    declaring[id] = path;
+    declaring[identity.Id] = path;
 }
 
 if (runtime.Plugins.IsEmpty && ruleSets.Count is 0)
@@ -172,55 +174,52 @@ static string? Readable(string path)
     }
 }
 
-// What makes a file a rule set here, and the only thing read on trust. Comments and trailing
-// commas are allowed for the reason Rulealize allows them: every document in this ecosystem is
-// written by hand, and the ones worth reading carry prose.
-static string? Identifier(string text)
+// What a file in this folder turns out to be, decided by Rulealize rather than here.
+// `RuleSetIdentity.ReadFrom` is the reading a fetcher makes the moment a document arrives —
+// what did I just get — and it is the same question this asks of a file it did not fetch.
+//
+// A refusal is passed over rather than reported, because most of what it refuses is not a
+// rule set and was never meant to be: the deps and runtimeconfig a publish leaves in the same
+// folder are the ordinary case. A document that *was* meant to be one and cannot be read is
+// not lost for long — the ledger names an identifier that no document answered to, and
+// declared.sh says so.
+static RuleSetIdentity? Identity(string text)
 {
     try
     {
-        using JsonDocument document = JsonDocument.Parse(text, Lenient);
-
-        return document.RootElement.ValueKind is JsonValueKind.Object
-            && document.RootElement.TryGetProperty("id", out JsonElement id)
-            && id.ValueKind is JsonValueKind.String
-                ? id.GetString()
-                : null;
+        return RuleSetIdentity.ReadFrom(text);
     }
-    catch (JsonException)
+    catch (RuleSetBuildException)
     {
         return null;
     }
 }
 
-// A document that has an `id` is one somebody meant as a rule set, so everything after this
-// throws rather than passing over. `requires` and `uses` come from Rulealize; the rest is the
-// core's own reserved keys, read as what they are.
-static RuleSetClaim Read(string id, string text)
+// Everything else a rule set entry holds. `requires` and `uses` are Rulealize's readers, so no
+// constraint is parsed twice; the input names are the keys of a section the core reserves, and
+// they are the one thing here this tool reads out of the format itself.
+static RuleSetClaim Read(RuleSetIdentity identity, string text)
 {
-    using JsonDocument document = JsonDocument.Parse(text, Lenient);
-    JsonElement root = document.RootElement;
-
-    if (!root.TryGetProperty("version", out JsonElement declared) || declared.ValueKind is not JsonValueKind.String)
-    {
-        throw new FormatException($"'{id}' declares no version, and a version is what a `uses` constraint answers.");
-    }
-
-    // The runtime reads a held rule set's version as a System.Version and nothing else, so a
-    // document whose version is not one is a document no `uses` entry could ever accept.
-    if (!Version.TryParse(declared.GetString(), out Version? version))
+    // `RuleSetIdentity` reports the version as the document wrote it and does not judge it,
+    // which is right for a reading that has to work on anything that arrived. A ledger needs
+    // more: the runtime matches a held rule set on a System.Version, so a document whose
+    // version is not one is a document no `uses` entry could ever accept — `Satisfies` would
+    // answer false for every constraint, for ever, and never say why.
+    if (!Version.TryParse(identity.Version, out Version? version))
     {
         throw new FormatException(
-            $"'{id}' writes version '{declared.GetString()}', which is not a version a `uses` entry could name.");
+            $"'{identity.Id}' writes version '{identity.Version}', which is not a version a `uses` entry could name.");
     }
 
-    string[] inputs = root.TryGetProperty("inputs", out JsonElement written)
+    using JsonDocument document = JsonDocument.Parse(text, Lenient);
+
+    string[] inputs = document.RootElement.TryGetProperty("inputs", out JsonElement written)
         && written.ValueKind is JsonValueKind.Object
             ? [.. written.EnumerateObject().Select(static input => input.Name).Order(StringComparer.Ordinal)]
             : [];
 
     return new RuleSetClaim(
-        id,
+        identity.Id,
         Release(version),
         [.. PluginRequirement.ReadFrom(text)],
         [.. RuleSetRequirement.ReadFrom(text)],
