@@ -1,22 +1,29 @@
 {
   "$schema": "rulealize/registry/index/v1",
   "checked": "2026-08-30T04:00:00Z",
-  "plugins": [],
+  "plugins": [
+    { "id": "Acme.Vocab", "namespace": "acme", "prefix": null, "latest": "1.0.0", "withheld": 0 }
+  ],
   "ruleSets": [
     {
       "id": "Acme.Rules.Roster",
       "latest": "1.0.0",
       "holds": 2,
       "withheld": 0,
-      "description": "A composite holding one indexed rule set and one that is not."
+      "description": "A composite holding one indexed rule set and one that is not.",
+      "inputs": ["assign", "release"]
     },
     {
       "id": "Acme.Rules.Shift",
       "latest": "1.0.0",
       "holds": 0,
       "withheld": 1,
-      "description": "A component with one release the catalogue would not index."
+      "description": "A component with one release the catalogue would not index.",
+      "inputs": ["close", "open"]
     }
   ],
-  "operations": []
+  "operations": [
+    { "op": "acme.each", "kind": "expression", "plugin": "Acme.Vocab" },
+    { "op": "acme.some", "kind": "expression", "plugin": "Acme.Vocab" }
+  ]
 }

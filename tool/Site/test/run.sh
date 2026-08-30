@@ -185,6 +185,19 @@ grep -q 'None yet' "$work/plain/index.html"
 report $? "says none rather than an empty table of rule sets"
 
 echo
+
+# 8. The search. It is the one part of this site that is a program rather than a page, and the
+# cases for it are a program too — the script is lifted out of the rendered page and run, so
+# what is tested is what is served rather than a copy of it kept in step by hand.
+if ! command -v node >/dev/null; then
+    echo "  FAIL  the search cases need node, and it is not here"
+    failed=$((failed + 1))
+else
+    (cd "$root" && node tool/Site/test/search.mjs "$work/ruleset")
+    report $? "the search finds what it is given"
+fi
+
+echo
 if [[ $failed -gt 0 ]]; then
     echo "$failed failed."
     exit 1

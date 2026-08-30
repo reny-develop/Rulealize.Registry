@@ -686,8 +686,11 @@ static async Task WriteFront(List<Plugin> plugins, List<RuleSet> ruleSets, strin
         """);
 
     body.Append("""
-        <h2>Find an operation</h2>
-        <input id="q" type="search" placeholder="grid.ray, seq., state&hellip;" autocomplete="off" spellcheck="false">
+        <h2>Find a name</h2>
+        <p>An operation out of a rule set, or an input out of somebody else's document — both are
+        names you arrive holding with no way to know whose they are, which is the one question a
+        package feed structurally cannot answer.</p>
+        <input id="q" type="search" placeholder="grid.ray, seq., grant, quota&hellip;" autocomplete="off" spellcheck="false">
         <p id="count" class="meta"></p>
         <ul id="results" class="results"></ul>
         """);
@@ -820,33 +823,53 @@ static async Task WriteFront(List<Plugin> plugins, List<RuleSet> ruleSets, strin
         const results = document.getElementById('results');
         const count = document.getElementById('count');
         const box = document.getElementById('q');
-        let operations = [];
+
+        // One flat list of {name, kind, from, href}, because a searcher does not know which of
+        // the two kinds the name in their hand belongs to — that is the question they came
+        // with. Matching is on the name alone and never on a description: a search that
+        // sometimes hits prose is one nobody can predict, and predictable is most of what a
+        // search over a few hundred short names has to be.
+        let names = [];
+        let summary = '';
 
         fetch('index.json').then(r => r.json()).then(data => {
-          operations = data.operations;
-          count.textContent = operations.length + ' operations indexed.';
+          const operations = data.operations ?? [];
+          const ruleSets = data.ruleSets ?? [];
+
+          names = [
+            ...operations.map(o => (
+              { name: o.op, kind: o.kind, from: o.plugin, href: 'op/' + o.op + '.html' })),
+            ...ruleSets.flatMap(r => [
+              { name: r.id, kind: 'rule set', from: '', href: 'ruleset/' + r.id + '.html' },
+              ...(r.inputs ?? []).map(i => (
+                { name: i, kind: 'input', from: r.id, href: 'ruleset/' + r.id + '.html' }))
+            ])
+          ];
+
+          summary = operations.length + ' operations and ' + ruleSets.length + ' rule sets indexed.';
+          count.textContent = summary;
         });
 
         box.addEventListener('input', () => {
           const term = box.value.trim().toLowerCase();
           if (!term) {
             results.replaceChildren();
-            count.textContent = operations.length + ' operations indexed.';
+            count.textContent = summary;
             return;
           }
-          const hits = operations.filter(o => o.op.toLowerCase().includes(term));
-          count.textContent = hits.length + ' of ' + operations.length + ' match.';
-          results.replaceChildren(...hits.slice(0, 60).map(o => {
+          const hits = names.filter(n => n.name.toLowerCase().includes(term));
+          count.textContent = hits.length + ' of ' + names.length + ' match.';
+          results.replaceChildren(...hits.slice(0, 60).map(n => {
             const li = document.createElement('li');
             const a = document.createElement('a');
-            a.href = 'op/' + o.op + '.html';
-            a.textContent = o.op;
+            a.href = n.href;
+            a.textContent = n.name;
             const kind = document.createElement('span');
             kind.className = 'kind';
-            kind.textContent = o.kind;
+            kind.textContent = n.kind;
             const from = document.createElement('span');
             from.className = 'from';
-            from.textContent = o.plugin;
+            from.textContent = n.from;
             li.append(a, kind, from);
             return li;
           }));

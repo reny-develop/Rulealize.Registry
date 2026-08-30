@@ -73,7 +73,7 @@ dotnet run --project tool/Catalogue -- ledger/submitted.json work/probe/Rulealiz
 
 | | |
 | --- | --- |
-| `catalogue/index.json` | every plugin, operation and rule set in summary — 10 KB at the size it is today, which is what makes search a client-side matter |
+| `catalogue/index.json` | every plugin, operation and rule set in summary, with the names the site searches — 13 KB at the size it is today, which is what makes search a client-side matter |
 | `catalogue/plugin/<id>.json` | one plugin, every released version, every operation of each |
 | `catalogue/ruleset/<id>.json` | one rule set, every released version, what each holds and requires |
 

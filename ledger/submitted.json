@@ -17,6 +17,9 @@
     { "id": "Rulealize.Plugin.TypeSchema", "version": "1.1.0", "namespace": "type", "prefix": null }
   ],
   "ruleSets": [
-    { "id": "Rulealize.RuleSet.Request", "version": "1.0.0" }
+    { "id": "Rulealize.RuleSet.Checklist", "version": "1.0.0" },
+    { "id": "Rulealize.RuleSet.Quota", "version": "1.0.0" },
+    { "id": "Rulealize.RuleSet.Request", "version": "1.0.0" },
+    { "id": "Rulealize.RuleSet.Signatures", "version": "1.0.0" }
   ]
 }
