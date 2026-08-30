@@ -327,6 +327,7 @@ static async Task Write(string path, string title, string root, string body) =>
         <footer>
         <a href="https://github.com/reny-develop/Rulealize.Registry">Repository</a>
         <a href="https://github.com/reny-develop/Rulealize.Registry/blob/main/doc/policy.md">Grant policy</a>
+        <a href="https://github.com/reny-develop/Rulealize.Registry/blob/main/doc/publish.md">Publishing</a>
         <a href="https://github.com/reny-develop/Rulealize.Registry/blob/main/ledger/submitted.json">Ledger</a>
         <a href="https://github.com/reny-develop/Rulealize">Rulealize</a>
         {(CheckedAt is null ? "" : $"<span class=\"checked\">Last checked {H(Day(CheckedAt))}</span>")}
@@ -759,7 +760,9 @@ static async Task WriteFront(List<Plugin> plugins, List<RuleSet> ruleSets, strin
         body.Append("""
             <p class="meta">None yet. A rule set is published as a package whose <code>ruleset</code>
             folder holds one document, and it is submitted the way a plugin is — one line naming the
-            package and the version its document was read at.</p>
+            package and the version its document was read at.
+            <a href="https://github.com/reny-develop/Rulealize.Registry/blob/main/doc/publish.md">What to
+            build</a>.</p>
             """);
     }
     else
