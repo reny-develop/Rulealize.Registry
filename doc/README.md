@@ -14,8 +14,8 @@ are spoken for is not a fact about the runtime, and the runtime is not where it 
 recorded.
 
 The claim ledger the policy governs exists as data — [`ledger/submitted.json`](../ledger/submitted.json),
-one line per plugin, every line held to the package it names by [`tool/Ledger`](../tool/Ledger/)
-loading it. What that loading finds goes into the catalogue built by
-[`tool/Catalogue`](../tool/Catalogue/), which is committed nowhere because it is derived from
-nuget.org on every run. [The readme](../README.md) describes both, and why only one of them is
-in git.
+one line per package, every line held to the package it names by [`tool/Ledger`](../tool/Ledger/)
+— which loads a plugin's assembly and reads a rule set's document, in one sweep of one folder.
+What that finds goes into the catalogue built by [`tool/Catalogue`](../tool/Catalogue/), which
+is committed nowhere because it is derived from nuget.org on every run. [The readme](../README.md)
+describes both, and why only one of them is in git.

@@ -1,0 +1,19 @@
+{
+  "$schema": "rulealize/registry/ruleset/v1",
+  "id": "Acme.Rules.Shift",
+  "admitted": "1.0.0",
+  "latest": "1.0.0",
+  "versions": [
+    {
+      "version": "1.0.0",
+      "requires": [ { "plugin": "Rulealize.Plugin.State", "version": "^1.0" } ],
+      "uses": [],
+      "inputs": ["open", "close"]
+    },
+    {
+      "version": "1.1.0",
+      "withheld": "claims",
+      "claimed": { "id": "shift", "version": "1.1.0" }
+    }
+  ]
+}

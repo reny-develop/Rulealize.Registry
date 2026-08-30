@@ -9,9 +9,9 @@
 #
 # What is left over never waits on anybody. A submission with something wrong in it says so on
 # the pull request and is the submitter's to push again; a pull request that is not a
-# submission is closed, because this repository indexes plugins and takes nothing else that
-# way. Nothing is labelled, nobody is assigned, and no notification is owed to a maintainer
-# who has nothing to decide.
+# submission is closed, because this repository indexes plugins and rule sets and takes
+# nothing else that way. Nothing is labelled, nobody is assigned, and no notification is owed
+# to a maintainer who has nothing to decide.
 #
 # pull_request_target runs this file as it is on main, with a token that can merge — so the
 # gate reads the pull request as data and never runs a line of it. The only thing that comes
@@ -163,16 +163,16 @@ jobs:
           case "$VERDICT" in
             admit)
               if [[ "$REQUIRED_OK" != "true" ]]; then
-                body="This submits a plugin and touches nothing else. Auto-merge is not being turned on, because what it would merge on is not what a submission is admitted on here:
+                body="This is a submission and touches nothing else. Auto-merge is not being turned on, because what it would merge on is not what a submission is admitted on here:
 
           ${REQUIRED_REASONS}
 
           Nothing about this pull request is wrong, and nothing about it is yours to change. It waits."
               elif [[ "$DRY_RUN" == "true" ]]; then
-                body="This submits a plugin and touches nothing else, so it would merge as soon as the checks pass. Auto-merge is not enabled yet: the gate is in dry run while it is watched."
+                body="This is a submission and touches nothing else, so it would merge as soon as the checks pass. Auto-merge is not enabled yet: the gate is in dry run while it is watched."
               else
                 gh pr merge "$PR" --auto --squash
-                body="This submits a plugin and touches nothing else, so there is nothing here for a person to decide. It merges as soon as the checks pass — the ledger is derived by loading the package you named, and that is what decides whether what you wrote is true."
+                body="This is a submission and touches nothing else, so there is nothing here for a person to decide. It merges as soon as the checks pass — every entry is derived from the package you named, and that is what decides whether what you wrote is true."
               fi
               ;;
 
@@ -184,10 +184,10 @@ jobs:
           ${REASONS}"
               ;;
 
-            # Not a submission at all. This repository indexes plugins and takes nothing else
-            # through a pull request, so it is closed rather than left open for somebody who
-            # is never coming — the exception being the owner, whose changes to the tools
-            # arrive this way on purpose.
+            # Not a submission at all. This repository indexes plugins and rule sets and takes
+            # nothing else through a pull request, so it is closed rather than left open for
+            # somebody who is never coming — the exception being the owner, whose changes to
+            # the tools arrive this way on purpose.
             close)
               body="This repository takes submissions to [\`ledger/submitted.json\`](https://github.com/${GITHUB_REPOSITORY}/blob/main/ledger/submitted.json) and nothing else through a pull request. Anything about the tools, the site or the policy belongs in an [issue](https://github.com/${GITHUB_REPOSITORY}/issues).
 

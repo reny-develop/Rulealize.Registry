@@ -1,0 +1,21 @@
+{
+  "$schema": "rulealize/registry/ruleset/v1",
+  "id": "Acme.Rules.Roster",
+  "admitted": "1.0.0",
+  "latest": "1.0.0",
+  "description": "A composite holding one indexed rule set and one that is not.",
+  "versions": [
+    {
+      "version": "1.0.0",
+      "requires": [
+        { "plugin": "Rulealize.Plugin.State", "version": "^1.0" },
+        { "plugin": "Acme.Deploy.Rules", "version": null }
+      ],
+      "uses": [
+        { "ruleSet": "Acme.Rules.Shift", "version": "^1.0", "as": "shift" },
+        { "ruleSet": "approval", "version": null, "as": "req" }
+      ],
+      "inputs": ["assign", "release"]
+    }
+  ]
+}
