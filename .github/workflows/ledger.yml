@@ -83,7 +83,14 @@ jobs:
             curl -sSfL -o "work/${id}.nupkg" "${feed}/${lower}/${version}/${lower}.${version}.nupkg"
 
             rm -rf work/one && mkdir -p work/one
-            unzip -o -j "work/${id}.nupkg" 'ruleset/*.json' -d work/one
+
+            # -C matches the folder without regard to case, because the catalogue does and the
+            # two have to agree. A package that is indexed daily and cannot be admitted here is
+            # worse than either answer would have been on its own.
+            #
+            # A failure is swallowed, because unzip's is "no matching files" — which is what the
+            # count below says, and says better: with a package identifier and a version in it.
+            unzip -o -j -C "work/${id}.nupkg" 'ruleset/*.json' -d work/one || true
 
             # One package, one document. `uses` resolves an identifier to a package, so a
             # package holding two would put a map back in the middle of that.
