@@ -16,5 +16,7 @@
     { "id": "Rulealize.Plugin.Tuple", "version": "1.0.0", "namespace": "tuple", "prefix": null },
     { "id": "Rulealize.Plugin.TypeSchema", "version": "1.1.0", "namespace": "type", "prefix": null }
   ],
-  "ruleSets": []
+  "ruleSets": [
+    { "id": "Rulealize.RuleSet.Request", "version": "1.0.0" }
+  ]
 }

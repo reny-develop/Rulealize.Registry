@@ -510,11 +510,18 @@ static string RuleSetBody(RuleSet ruleSet, HashSet<string> indexed, HashSet<stri
         ]</code></pre>
         """);
     body.Append(
-        "<p>The identifier is the package identifier, so nothing has to look it up: "
-        + "<a href=\"https://github.com/reny-develop/Rulealize.Cli\"><code>rulealize restore</code></a> "
-        + "fetches what <code>uses</code> names the way it fetches what <code>requires</code> names. "
-        + "<code>as</code> is the short name the holding document calls it by, and it is what qualifies "
-        + "this rule set's inputs inside that one.</p>");
+        "<p>The identifier is the package identifier, so nothing has to look it up. <code>as</code> is "
+        + "the short name the holding document calls it by, and it is what qualifies this rule set's "
+        + "inputs inside that one.</p>");
+
+    // Said here because this page is where somebody decides to hold it, and a page that
+    // implied the fetch already worked would be found out at the worst moment.
+    body.Append(
+        "<p class=\"meta\">Getting what a <code>uses</code> names is the feed's job rather than this "
+        + "index's — and <a href=\"https://github.com/reny-develop/Rulealize.Cli\"><code>rulealize "
+        + "restore</code></a> does not do it yet: today it resolves a <code>uses</code> against the "
+        + "documents beside the one it was handed. Until it does, download this package and put the "
+        + "document in that folder.</p>");
 
     foreach (RuleSetRelease release in ruleSet.Releases.AsEnumerable().Reverse())
     {
