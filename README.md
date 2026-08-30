@@ -219,16 +219,14 @@ The message names a key the document did not write, which is worth knowing befor
 So the identifier being long costs a holding document one word, once, and it is a word it was
 going to want anyway.
 
-**Fetching one asks nothing of this index.** A `uses` names a package, so getting what it
-names is the operation `rulealize restore` already performs for a `requires`, pointed at a
-different folder.
+**Fetching one asks nothing of this index.** A `uses` names a package, so
+[`rulealize restore`](https://github.com/reny-develop/Rulealize.Cli) goes to the feed for one
+the way it goes to the feed for a `requires` — the whole graph, into the folder the holding
+document resolves its components from. Which version it takes is the runtime's reading, so a
+`uses` and a `requires` are resolved by one statement of the same rule.
 
-**It does not do that yet.** Today it resolves a `uses` against the documents beside the one
-it was handed, and reports a rule set that is not there as missing — which is the right
-answer while nothing is published and the wrong one the day something is. What the convention
-above settles is where it goes when it does: to the feed, and not to here. This index is for
-finding a rule set you could not already name, and for saying which of its releases are not
-worth resolving to.
+**This index is for the questions a feed cannot answer**: finding a rule set you could not
+already name, and saying which of its releases are not worth resolving to.
 
 The registry indexes the document, and never the case. **A rule set's state is the user's own
 file, on their own disk.**

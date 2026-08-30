@@ -127,15 +127,32 @@ set's page, marked, carrying what it declared, and `latest` stays at the newest 
 still agrees. Nothing resolves to a withheld release, which is the point: the alternative is
 that somebody's restore does.
 
-## What cannot hold it yet
+## What can hold it
 
-**Nothing fetches a published rule set today.** `rulealize restore` resolves a `uses` against
-the documents beside the one it was handed and reports anything else as missing; Studio
-resolves against the folder beside the composite. Both go to a folder, and neither goes to the
-feed.
+[`rulealize restore`](https://github.com/reny-develop/Rulealize.Cli), from 0.8.0, fetches what
+a `uses` names — through the whole graph, into the folder the holding document resolves its
+components from:
 
-So a package published now is admitted, indexed, and consumable only by somebody who downloads
-it themselves. That is worth knowing before you spend the name, because
-[a claim is permanent](policy.md#a-claim-is-permanent) — and it is also why the index is here
-first. An index that arrived after publishing had begun would arrive after the first release
-that needed it.
+```
+$ rulealize restore roster.json
+  Acme.Rules.Approval@1.0.0 -> Acme.Rules.Approval.json
+1 rule set -> .
+holding 1 rule set:
+  Acme.Rules.Approval@1.0.0 ('Acme.Rules.Approval.json')
+  …
+7 plugins -> plugin
+'roster.json' compiles against it.
+```
+
+The plugins are the union of what every document in the graph requires, which is why there are
+more of them than the composite's own `requires` names.
+
+It never writes over a document already in that folder, so a component its author keeps beside
+the composite wins over anything published under the same identifier.
+
+**Not everything does.** A host that resolves components out of a folder and never fetches is
+a supported arrangement and a common one — a deployment has its documents already. What such a
+host needs is somebody to have put them there, which is what the command above is for.
+
+Before you spend the name, the thing worth knowing is that
+[a claim is permanent](policy.md#a-claim-is-permanent). Nothing else about publishing is.

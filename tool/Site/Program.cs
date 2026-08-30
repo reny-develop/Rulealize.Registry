@@ -516,14 +516,14 @@ static string RuleSetBody(RuleSet ruleSet, HashSet<string> indexed, HashSet<stri
         + "identifier and may not contain a <code>.</code>, so leaving it out is refused with a message "
         + "about a key you did not write.</p>");
 
-    // Said here because this page is where somebody decides to hold it, and a page that
-    // implied the fetch already worked would be found out at the worst moment.
+    // Said here because this page is where somebody decides to hold it, and the next thing
+    // they want is the one command that makes the decision act.
     body.Append(
         "<p class=\"meta\">Getting what a <code>uses</code> names is the feed's job rather than this "
-        + "index's — and <a href=\"https://github.com/reny-develop/Rulealize.Cli\"><code>rulealize "
-        + "restore</code></a> does not do it yet: today it resolves a <code>uses</code> against the "
-        + "documents beside the one it was handed. Until it does, download this package and put the "
-        + "document in that folder.</p>");
+        + "index's. <a href=\"https://github.com/reny-develop/Rulealize.Cli\"><code>rulealize "
+        + "restore</code></a> does it from 0.8.0 — the whole graph, into the folder the holding "
+        + "document resolves its components from — and takes the lowest version satisfying every "
+        + "constraint that named it, which is the rule a <code>requires</code> is resolved by.</p>");
 
     foreach (RuleSetRelease release in ruleSet.Releases.AsEnumerable().Reverse())
     {
