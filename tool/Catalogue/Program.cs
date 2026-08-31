@@ -208,7 +208,7 @@ foreach (JsonElement claim in ledger.RootElement.TryGetProperty("ruleSets", out 
         indexed = package;
         entries.Add(new RuleSetVersion(
             version, package.Declared.Requires, package.Declared.Uses, package.Declared.Inputs,
-            package.Declared.Parts, null, null));
+            package.Declared.Parts, package.Declared.Shipped, null, null));
     }
 
     RuleSetVersion? newest = entries.LastOrDefault(static entry => entry.Withheld is null);
@@ -488,13 +488,29 @@ Document ProbeRuleSet(string folder, string id)
             .Where(other => !string.Equals(other, entry.GetProperty("id").GetString(), StringComparison.Ordinal))
     ];
 
+    // Every document in the package, the entry point included, reduced to the pair that says
+    // what it offers and what it holds. A composite's offered inputs are its components', and
+    // its components may be right here — so throwing these away was what made it look as
+    // though an index could not know what a composite offers.
+    Dictionary<string, Piece> shipped = found.ToDictionary(
+        one => one.GetProperty("id").GetString()!,
+        Read,
+        StringComparer.Ordinal);
+
     return new Document(
         entry.GetProperty("id").GetString()!,
         entry.GetProperty("admitted").GetString()!,
         entry.GetProperty("requires").Clone(),
         entry.GetProperty("uses").Clone(),
         entry.GetProperty("inputs").Clone(),
-        parts);
+        parts,
+        shipped);
+
+    static Piece Read(JsonElement one) =>
+        new(
+            [.. one.GetProperty("inputs").EnumerateArray().Select(input => input.GetString()!)],
+            [.. one.GetProperty("uses").EnumerateArray()
+                .Select(held => (held.GetProperty("ruleSet").GetString()!, held.GetProperty("as").GetString()!))]);
 }
 
 // The feed's version string, written the way the probe writes a document's own. nuget.org
@@ -507,8 +523,82 @@ static string Release(string version) =>
 
 // ── output ─────────────────────────────────────────────────────────────────────────
 
+/// <summary>Every document this crawl read, by identifier, whichever package it came in.</summary>
+/// <remarks>
+/// One map rather than one per package, because a composite's components are as often in
+/// somebody else's package as in its own — <c>SignedRequest</c> holds two rule sets published
+/// separately, and <c>Exchange</c> holds one it ships itself. Both are answered the same way
+/// once everything crawled is in one place, and it is a second pass rather than a first because
+/// a document may hold one the crawl has not reached yet.
+/// </remarks>
+static Dictionary<string, Piece> Pieces(List<RuleSetEntry> ruleSets)
+{
+    Dictionary<string, Piece> pieces = new(StringComparer.Ordinal);
+
+    foreach (RuleSetEntry ruleSet in ruleSets)
+    {
+        if (ruleSet.Versions.LastOrDefault(static version => version.Withheld is null) is not RuleSetVersion newest)
+        {
+            continue;
+        }
+
+        foreach ((string id, Piece piece) in newest.Shipped ?? [])
+        {
+            _ = pieces.TryAdd(id, piece);
+        }
+    }
+
+    return pieces;
+}
+
+/// <summary>The inputs a rule set offers, its components' included, qualified as it names them.</summary>
+/// <remarks>
+/// <para>
+/// A held rule set's inputs are offered as <c>alias.input</c>, as deep as the documents nest,
+/// so this is the same walk the runtime makes and it needs nothing the runtime needs: no
+/// plugins, no compilation, and no state. Only the documents, which the crawl has.
+/// </para>
+/// <para>
+/// A component this crawl never saw contributes nothing rather than a guess. That is a
+/// composite holding something nobody published, which is a package no restore can complete
+/// anyway — the page says so separately, and inventing names for it here would be this index
+/// claiming to know what it does not.
+/// </para>
+/// </remarks>
+static IReadOnlyList<string> Offers(string id, Dictionary<string, Piece> pieces)
+{
+    List<string> offered = [];
+    Walk(id, "", []);
+    offered.Sort(StringComparer.Ordinal);
+    return offered;
+
+    void Walk(string ruleSet, string prefix, HashSet<string> seen)
+    {
+        // A cycle is the runtime's to refuse and it does, naming the documents in it. This only
+        // has to not spin while reading one.
+        if (!pieces.TryGetValue(ruleSet, out Piece? piece) || !seen.Add(ruleSet))
+        {
+            return;
+        }
+
+        foreach (string input in piece.Inputs)
+        {
+            offered.Add($"{prefix}{input}");
+        }
+
+        foreach ((string held, string alias) in piece.Uses)
+        {
+            Walk(held, $"{prefix}{alias}.", seen);
+        }
+
+        _ = seen.Remove(ruleSet);
+    }
+}
+
 static void WriteCatalogue(List<PluginEntry> plugins, List<RuleSetEntry> ruleSets, string folder)
 {
+    Dictionary<string, Piece> pieces = Pieces(ruleSets);
+
     Directory.CreateDirectory(Path.Combine(folder, "plugin"));
     Directory.CreateDirectory(Path.Combine(folder, "ruleset"));
 
@@ -701,17 +791,19 @@ static void WriteCatalogue(List<PluginEntry> plugins, List<RuleSetEntry> ruleSet
             // The newest indexed release's, for the reason the operations are: offering a name
             // that was withdrawn two releases ago is worse than not offering it. A rule set
             // with no indexed release offers none, and its page still records that they were.
+            // What it offers, which for a leaf is its own inputs and for a composite is its
+            // components' under the names it calls them by. A registered rule set has one entry
+            // point, and this is that entry point's whole surface: the names somebody holding
+            // it would write. Searching them is what makes `confirm` findable on a document
+            // whose own `inputs` section is empty.
             writer.WritePropertyName("inputs");
-            if (newest?.Inputs is JsonElement inputs)
+            writer.WriteStartArray();
+            foreach (string offered in Offers(ruleSet.Id, pieces))
             {
-                inputs.WriteTo(writer);
-            }
-            else
-            {
-                writer.WriteStartArray();
-                writer.WriteEndArray();
+                writer.WriteStringValue(offered);
             }
 
+            writer.WriteEndArray();
             writer.WriteEndObject();
         }
 
@@ -845,7 +937,17 @@ internal sealed record Document(
     JsonElement Requires,
     JsonElement Uses,
     JsonElement Inputs,
-    string[] Parts);
+    string[] Parts,
+    Dictionary<string, Piece> Shipped);
+
+/// <summary>What one document offers and what it holds, which is all it takes to expand it.</summary>
+/// <remarks>
+/// An input a composite offers is <c>alias.input</c>, so working out what a rule set offers is
+/// reading its <c>uses</c> for the aliases and each component for its inputs. No compilation,
+/// no plugins, and nothing the runtime has to be asked — which is why this belongs here rather
+/// than being a thing the index cannot know.
+/// </remarks>
+internal sealed record Piece(string[] Inputs, (string RuleSet, string Alias)[] Uses);
 
 internal sealed record RuleSetPackage(
     Document Declared,
@@ -863,14 +965,15 @@ internal sealed record RuleSetVersion(
     JsonElement? Uses,
     JsonElement? Inputs,
     string[]? Parts,
+    Dictionary<string, Piece>? Shipped,
     string? Withheld,
     Document? Claimed)
 {
     internal static RuleSetVersion Unreadable(string version) =>
-        new(version, null, null, null, null, "unreadable", null);
+        new(version, null, null, null, null, null, "unreadable", null);
 
     internal static RuleSetVersion Moved(string version, Document declared) =>
-        new(version, null, null, null, null, "claims", declared);
+        new(version, null, null, null, null, null, "claims", declared);
 }
 
 internal sealed record RuleSetEntry(
