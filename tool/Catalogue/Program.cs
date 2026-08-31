@@ -207,7 +207,8 @@ foreach (JsonElement claim in ledger.RootElement.TryGetProperty("ruleSets", out 
 
         indexed = package;
         entries.Add(new RuleSetVersion(
-            version, package.Declared.Requires, package.Declared.Uses, package.Declared.Inputs, null, null));
+            version, package.Declared.Requires, package.Declared.Uses, package.Declared.Inputs,
+            package.Declared.Parts, null, null));
     }
 
     RuleSetVersion? newest = entries.LastOrDefault(static entry => entry.Withheld is null);
@@ -337,13 +338,18 @@ async Task<RuleSetPackage> FetchRuleSet(string id, string version)
             && entry.FullName.Count(static character => character is '/') is 1)
     ];
 
-    if (documents.Length is not 1)
+    if (documents.Length is 0)
     {
-        throw new InvalidOperationException(
-            $"{id} {version} holds {documents.Length} documents in `ruleset`, and a rule set package holds one.");
+        throw new InvalidOperationException($"{id} {version} holds no document in `ruleset`.");
     }
 
-    documents[0].ExtractToFile(Path.Combine(folder, Path.GetFileName(documents[0].FullName)), overwrite: true);
+    // All of them. One declares the package's own identifier and is what this entry is about;
+    // any others are that one's own components, shipped with it because they are part of it.
+    // The probe reads the folder, so which is which is decided from what each declares.
+    foreach (ZipArchiveEntry document in documents)
+    {
+        document.ExtractToFile(Path.Combine(folder, Path.GetFileName(document.FullName)), overwrite: true);
+    }
 
     ZipArchiveEntry nuspec = archive.Entries.Single(entry =>
         !entry.FullName.Contains('/', StringComparison.Ordinal)
@@ -354,7 +360,7 @@ async Task<RuleSetPackage> FetchRuleSet(string id, string version)
         .Single(element => element.Name.LocalName is "metadata");
 
     return new RuleSetPackage(
-        ProbeRuleSet(folder),
+        ProbeRuleSet(folder, id),
         Value(metadata, "description"),
         Repository(metadata),
         Value(metadata, "license"));
@@ -443,24 +449,52 @@ Claimed Probe(string folder, string id)
         plugin.GetProperty("operations").Clone());
 }
 
-// Not selected by identifier, the way a plugin is. Which identifier the document declares is
-// the thing being checked, so asking the probe for one by name would be asking it to confirm
-// what it was told. The folder holds one document because the package did.
-Document ProbeRuleSet(string folder)
+// Which document the entry is about, and what else came with it.
+//
+// A package holding one document is the ordinary case and this reads it. A package holding
+// several is one whose rule set is built out of parts, and then exactly one of them declares
+// the package's own identifier — that one is the entry, the rest are its components.
+//
+// Not selected by trusting the ledger, though it is compared against it: the identifier a
+// document declares is the thing being checked, so the entry is found by reading what each one
+// says and matching, and a package where none of them matches is withheld by the caller with
+// what it did declare recorded beside it.
+Document ProbeRuleSet(string folder, string id)
 {
     JsonElement[] found = [.. Reported(folder).GetProperty("ruleSets").EnumerateArray()];
 
-    if (found.Length is not 1)
+    if (found.Length is 0)
     {
-        throw new InvalidOperationException($"The probe read {found.Length} rule sets out of '{folder}'.");
+        throw new InvalidOperationException($"The probe read no rule set out of '{folder}'.");
     }
 
+    JsonElement entry = found.FirstOrDefault(
+        one => one.GetProperty("id").GetString() == id,
+        found.Length is 1 ? found[0] : default);
+
+    if (entry.ValueKind is JsonValueKind.Undefined)
+    {
+        throw new InvalidOperationException(
+            $"none of the {found.Length} documents declares '{id}'. They declare "
+            + string.Join(", ", found.Select(one => $"'{one.GetProperty("id").GetString()}'")) + ".");
+    }
+
+    // What shipped alongside, in the order the probe sorted them. Recorded because a `uses`
+    // naming one of these resolves — the package brings it — and a page that showed it as
+    // unindexed would be wrong about the one case where holding something unpublished is right.
+    string[] parts =
+    [
+        .. found.Select(one => one.GetProperty("id").GetString()!)
+            .Where(other => !string.Equals(other, entry.GetProperty("id").GetString(), StringComparison.Ordinal))
+    ];
+
     return new Document(
-        found[0].GetProperty("id").GetString()!,
-        found[0].GetProperty("admitted").GetString()!,
-        found[0].GetProperty("requires").Clone(),
-        found[0].GetProperty("uses").Clone(),
-        found[0].GetProperty("inputs").Clone());
+        entry.GetProperty("id").GetString()!,
+        entry.GetProperty("admitted").GetString()!,
+        entry.GetProperty("requires").Clone(),
+        entry.GetProperty("uses").Clone(),
+        entry.GetProperty("inputs").Clone(),
+        parts);
 }
 
 // The feed's version string, written the way the probe writes a document's own. nuget.org
@@ -581,6 +615,23 @@ static void WriteCatalogue(List<PluginEntry> plugins, List<RuleSetEntry> ruleSet
                     version.Uses!.Value.WriteTo(writer);
                     writer.WritePropertyName("inputs");
                     version.Inputs!.Value.WriteTo(writer);
+
+                    // What shipped in the same package: the parts this release is built out
+                    // of, where it is built out of any. A `uses` naming one of these resolves
+                    // — the package brings it — so a reader that did not know they existed
+                    // would report the one case where holding something unpublished is right
+                    // as the case where it is wrong.
+                    if (version.Parts is { Length: > 0 } parts)
+                    {
+                        writer.WritePropertyName("parts");
+                        writer.WriteStartArray();
+                        foreach (string part in parts)
+                        {
+                            writer.WriteStringValue(part);
+                        }
+
+                        writer.WriteEndArray();
+                    }
                 }
 
                 writer.WriteEndObject();
@@ -793,7 +844,8 @@ internal sealed record Document(
     string Admitted,
     JsonElement Requires,
     JsonElement Uses,
-    JsonElement Inputs);
+    JsonElement Inputs,
+    string[] Parts);
 
 internal sealed record RuleSetPackage(
     Document Declared,
@@ -810,14 +862,15 @@ internal sealed record RuleSetVersion(
     JsonElement? Requires,
     JsonElement? Uses,
     JsonElement? Inputs,
+    string[]? Parts,
     string? Withheld,
     Document? Claimed)
 {
     internal static RuleSetVersion Unreadable(string version) =>
-        new(version, null, null, null, "unreadable", null);
+        new(version, null, null, null, null, "unreadable", null);
 
     internal static RuleSetVersion Moved(string version, Document declared) =>
-        new(version, null, null, null, "claims", declared);
+        new(version, null, null, null, null, "claims", declared);
 }
 
 internal sealed record RuleSetEntry(

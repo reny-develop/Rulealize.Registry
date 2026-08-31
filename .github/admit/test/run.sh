@@ -355,7 +355,24 @@ declared refuses-another-document-id refuses "$held" \
 
 declared refuses-a-second-document refuses "$held" \
     "$(documents "$(document Acme.Rules.Approval)" "$(document Acme.Rules.Shift)")" \
-    "came out of the packages and was never submitted"
+    "neither a rule set anybody submitted nor part of one"
+
+# A package may ship the document named for it and the parts that one is built out of, the way
+# a library's internal types ship in its assembly. What keeps those from being an ungoverned
+# name space is that each is named under the package: nuget.org allocated that prefix, so two
+# packages cannot ship one identifier however many parts either is built from.
+declared agrees-with-a-part agrees "$held" \
+    "$(documents "$(document Acme.Rules.Approval)" "$(document Acme.Rules.Approval.Step)")"
+
+declared refuses-a-part-named-elsewhere refuses "$held" \
+    "$(documents "$(document Acme.Rules.Approval)" "$(document Acme.Rules.Shared)")" \
+    "neither a rule set anybody submitted nor part of one"
+
+# A package holding parts and nothing declaring its own name. `uses` names the package, so
+# there has to be a document that answers to it.
+declared refuses-a-package-with-no-entry refuses "$held" \
+    "$(documents "$(document Acme.Rules.Approval.Step)")" \
+    "no document of that name came out of the packages"
 
 # The package version and the document's own version, drifted apart. The fetch goes by the
 # first and every `uses` constraint is answered by the second, so a package resolvable at

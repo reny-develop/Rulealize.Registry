@@ -124,6 +124,11 @@ foreach (JsonElement summary in index.RootElement.TryGetProperty("ruleSets", out
 
         List<string> inputs = [.. Entries(release, "inputs").Select(static input => input.GetString()!)];
 
+        // Documents that shipped in the same package as this one. A `uses` naming one of them
+        // resolves without anything being fetched, which is the one case where holding
+        // something this index has no entry for is right rather than broken.
+        List<string> parts = [.. Entries(release, "parts").Select(static part => part.GetString()!)];
+
         Declared? claimed = release.TryGetProperty("claimed", out JsonElement said)
             ? new Declared(Text(said, "id"), Text(said, "version"))
             : null;
@@ -133,6 +138,7 @@ foreach (JsonElement summary in index.RootElement.TryGetProperty("ruleSets", out
             requires,
             uses,
             inputs,
+            parts,
             Text(release, "withheld"),
             claimed));
     }
@@ -550,16 +556,20 @@ static string RuleSetBody(RuleSet ruleSet, HashSet<string> indexed, HashSet<stri
             {
                 string named = $"{H(held.RuleSet)}{(held.Version is null ? "" : $" {H(held.Version)}")}";
 
-                // An identifier this index cannot answer for. Said as text rather than as a
-                // link that would 404, and counted below so the page says it once plainly.
+                // Three answers, and the middle one is the one worth having. Indexed: a link.
+                // Shipped in this same package: no link, because it has no page — and no
+                // warning either, because it is here. Neither: said as text, and counted below.
                 body.Append(indexed.Contains(held.RuleSet)
                     ? $"<li><a href=\"{H(held.RuleSet)}.html\"><code>{named}</code></a> as <code>{H(held.Alias)}</code></li>"
-                    : $"<li><code>{named}</code> as <code>{H(held.Alias)}</code> <span class=\"warn\">not indexed</span></li>");
+                    : release.Parts.Contains(held.RuleSet, StringComparer.Ordinal)
+                        ? $"<li><code>{named}</code> as <code>{H(held.Alias)}</code> <span class=\"meta\">ships with it</span></li>"
+                        : $"<li><code>{named}</code> as <code>{H(held.Alias)}</code> <span class=\"warn\">not indexed</span></li>");
             }
 
             body.Append("</ul>");
 
-            if (release.Uses.Any(held => !indexed.Contains(held.RuleSet)))
+            if (release.Uses.Any(held => !indexed.Contains(held.RuleSet)
+                && !release.Parts.Contains(held.RuleSet, StringComparer.Ordinal)))
             {
                 body.Append(
                     "<p class=\"meta\">A held rule set that is not indexed here is one nothing can fetch. "
@@ -921,6 +931,7 @@ internal sealed record RuleSetRelease(
     List<Needs> Requires,
     List<Held> Uses,
     List<string> Inputs,
+    List<string> Parts,
     string? Withheld,
     Declared? Claimed);
 

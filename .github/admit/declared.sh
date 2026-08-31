@@ -120,27 +120,39 @@ done < <(jq -r --slurpfile reserved "$reserved" '
 
 # ── rule sets ──────────────────────────────────────────────────────────────────────
 #
-# The same two comparisons and no others, because a rule set submission states no third thing.
-# A document declares one identifier and one version; the package was fetched by an identifier
-# at a version; and the whole of what is checked is that those are the same two strings.
+# Two comparisons per submitted rule set and no others, because a submission states no third
+# thing. A document declares one identifier and one version; the package was fetched by an
+# identifier at a version; and the whole of what is checked is that those are the same strings.
 #
-# There is no reserved list for either. The identifier IS the package identifier, which
-# nuget.org allocated and no two publishers can hold — so unlike a namespace there is nothing
-# here that could be taken by declaring it, and nothing to refuse in advance.
+# There is no reserved list. The identifier IS the package identifier, which nuget.org
+# allocated and no two publishers can hold — so unlike a namespace there is nothing here that
+# could be taken by declaring it, and nothing to refuse in advance.
+#
+# A package ships the document named for it, and — where that one is built out of parts — the
+# parts as well. So the derived set is not the submitted set: it is the submitted set plus
+# whatever those documents are made of.
+#
+# What keeps that from being an ungoverned name space is the prefix. An internal document's
+# identifier begins with the identifier of the package it ships in, which nuget.org allocated,
+# so two packages cannot ship one name however many parts either is built from. It is the
+# reason this can be allowed at all, and it is checked below rather than trusted.
 missing=$(jq -r --slurpfile derived "$derived" \
     '[(.ruleSets // [])[].id] - [($derived[0].ruleSets // [])[].id] | .[]' "$submitted")
-extra=$(jq -r --slurpfile submitted "$submitted" \
-    '[(.ruleSets // [])[].id] - [($submitted[0].ruleSets // [])[].id] | .[]' "$derived")
 
 while IFS= read -r id; do
     [[ -z "$id" ]] && continue
-    note "\`${id}\` was submitted, and no document of that name came out of the packages. A rule set is published under the identifier its document declares, and one package holds one document."
+    note "\`${id}\` was submitted, and no document of that name came out of the packages. A rule set is published under the identifier its document declares, and the package it ships in has to hold one that declares it."
 done <<<"$missing"
 
-while IFS= read -r id; do
-    [[ -z "$id" ]] && continue
-    note "\`${id}\` came out of the packages and was never submitted. Its identifier is not one anybody claimed here."
-done <<<"$extra"
+# Everything derived is either something submitted or something under it, and nothing else.
+while IFS= read -r line; do
+    [[ -z "$line" ]] && continue
+    note "$line"
+done < <(jq -r --slurpfile submitted "$submitted" '
+    [($submitted[0].ruleSets // [])[].id] as $claimed
+    | (.ruleSets // [])[].id
+    | select(. as $id | ($claimed | map(. as $c | $id == $c or ($id | startswith($c + "."))) | any) | not)
+    | "`\(.)` came out of the packages and is neither a rule set anybody submitted nor part of one. A document shipped beside another is named under it — `Acme.Rules.Ordering.Line` inside `Acme.Rules.Ordering` — so that no two packages can ship one identifier."' "$derived")
 
 while IFS= read -r entry; do
     [[ -z "$entry" ]] && continue
