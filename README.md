@@ -186,8 +186,9 @@ mattered.
 ### A published rule set
 
 A rule set is a document. A published one is a package with no `lib` folder, whose `ruleset`
-folder holds **exactly one** `.json`, and whose document declares the package's own identifier
-— [what to build](doc/publish.md#a-rule-set) is a project file that compiles nothing:
+folder holds **one declaring the package's own identifier** — and, where that one is built out
+of parts, those alongside it, each named under it. [What to
+build](doc/publish.md#a-rule-set) is a project file that compiles nothing:
 
 ```json
 { "id": "Acme.Rules.Approval", "version": "1.0.0" }

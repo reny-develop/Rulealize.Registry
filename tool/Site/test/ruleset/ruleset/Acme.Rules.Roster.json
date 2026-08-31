@@ -3,7 +3,7 @@
   "id": "Acme.Rules.Roster",
   "admitted": "1.0.0",
   "latest": "1.0.0",
-  "description": "A composite holding one indexed rule set and one that is not.",
+  "description": "A composite holding one indexed rule set, one that ships with it, and one that is neither.",
   "versions": [
     {
       "version": "1.0.0",
@@ -13,9 +13,11 @@
       ],
       "uses": [
         { "ruleSet": "Acme.Rules.Shift", "version": "^1.0", "as": "shift" },
+        { "ruleSet": "Acme.Rules.Roster.Slot", "version": "^1.0", "as": "slot" },
         { "ruleSet": "approval", "version": null, "as": "req" }
       ],
-      "inputs": ["assign", "release"]
+      "inputs": ["assign", "release"],
+      "parts": ["Acme.Rules.Roster.Slot"]
     }
   ]
 }

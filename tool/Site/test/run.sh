@@ -152,6 +152,15 @@ report $? "does not link a held rule set that is not indexed"
 grep -q 'A held rule set that is not indexed here is one nothing can fetch' "$page"
 report $? "says what an unindexed held rule set means"
 
+# A component that shipped in the same package as the document holding it. There is no page to
+# link to and nothing is wrong: it arrived with the thing that holds it. Warning about it would
+# report the one case where holding something unindexed is right as the case where it is wrong.
+grep -q 'Acme.Rules.Roster.Slot ^1.0</code> as <code>slot</code> <span class="meta">ships with it' "$page"
+report $? "says a held rule set that ships in the same package ships with it"
+
+! grep -q 'href="Acme.Rules.Roster.Slot.html"' "$page"
+report $? "does not link a part that has no page"
+
 # A vocabulary nobody publishes is a supported arrangement, so a `requires` naming one is
 # rendered rather than refused — and not linked, for the reason above.
 ! grep -q 'href="../plugin/Acme.Deploy.Rules.html"' "$page"

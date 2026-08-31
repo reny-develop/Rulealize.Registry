@@ -92,15 +92,25 @@ jobs:
             # count below says, and says better: with a package identifier and a version in it.
             unzip -o -j -C "work/${id}.nupkg" 'ruleset/*.json' -d work/one || true
 
-            # One package, one document. `uses` resolves an identifier to a package, so a
-            # package holding two would put a map back in the middle of that.
+            # At least one, and which of them is which is not this step's to decide. A package
+            # ships the document named for it and, where that one is built out of parts, those
+            # parts too — the way a library's internal types ship in its assembly rather than
+            # in packages of their own. What each one declares is read by the probe, and
+            # declared.sh holds the set to the rule: one entry point, and every other
+            # identifier under it.
             found=$(find work/one -name '*.json' | wc -l)
-            if [[ "$found" -ne 1 ]]; then
-              echo "::error file=ledger/submitted.json::${id} ${version} holds ${found} documents in \`ruleset\`, and a rule set package holds one."
+            if [[ "$found" -eq 0 ]]; then
+              echo "::error file=ledger/submitted.json::${id} ${version} holds no document in \`ruleset\`."
               exit 1
             fi
 
-            mv work/one/*.json "work/claimed/${id}.json"
+            # Numbered rather than named for the identifier, because the identifier is what is
+            # being checked and a file named for a claim would be this step believing it.
+            n=0
+            for document in work/one/*.json; do
+              n=$((n + 1))
+              mv "$document" "work/claimed/${id}.${n}.json"
+            done
             echo "::endgroup::"
           done
 

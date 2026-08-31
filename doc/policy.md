@@ -95,10 +95,17 @@ is a place where a fetch succeeds and the document that arrives is refused when 
 This registry compares exactly, for the same reason: a release whose document declares an
 identifier that is not, character for character, the one the ledger records is withheld.
 
-**One document per package.** The `ruleset` folder holds exactly one `.json`, and a package
-with none or with two is refused. An identifier that did not name a package would need
-something to turn it into one, and that something would have to be reachable before anybody
-could restore anything.
+**One document per package answers to the package's name**, and it is the one a `uses` naming
+that package gets. A package where none does is refused: an identifier that did not name a
+package would need something to turn it into one, and that something would have to be
+reachable before anybody could restore anything.
+
+A package may ship more than one document, where the rule set it publishes is built out of
+parts. Then **every other identifier in it is named under the package's** —
+`Acme.Rules.Ordering.Line` inside `Acme.Rules.Ordering`. The prefix is what keeps those from
+being a name space nobody allocates: the package identifier is nuget.org's, so everything
+under it is too, and no two packages can ship one identifier however many parts either is
+built from. [How to build one](publish.md#a-package-may-ship-more-than-one-document).
 
 ### There is no short name, and none is wanted
 
@@ -382,8 +389,9 @@ declares rather than your project file's. CI fetches the package at exactly that
 reads the document inside it, so a document and a package version that have drifted apart are
 refused here for the same reason a plugin's manifest and package are. Raise the two together.
 
-What you publish is a package with no `lib` folder, whose `ruleset` folder holds exactly one
-`.json`:
+What you publish is a package with no `lib` folder, whose `ruleset` folder holds a document
+declaring the identifier you submitted — and, where that one is built out of parts, those
+alongside it:
 
 ```
 Acme.Rules.Approval.1.0.0.nupkg
