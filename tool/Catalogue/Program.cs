@@ -317,9 +317,9 @@ async Task<Package> Fetch(string id, string version)
 }
 
 // A rule set package is a package with no `lib` folder: what it distributes is a document,
-// and a document targets no framework and depends on no assembly. `ruleset/` at the root and
-// exactly one `.json` in it, because `uses` resolves an identifier to a package and a package
-// holding two documents would put a map back in the middle of that.
+// and a document targets no framework and depends on no assembly. `ruleset/` at the root, and
+// in it one document declaring the package's own identifier, with any parts it is built out
+// of beside it, each named under that identifier.
 async Task<RuleSetPackage> FetchRuleSet(string id, string version)
 {
     string lower = id.ToLowerInvariant();
