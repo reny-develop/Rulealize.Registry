@@ -197,7 +197,7 @@ components from:
 ```
 $ rulealize restore roster.json
   Acme.Rules.Approval@1.0.0 -> Acme.Rules.Approval.json
-1 rule set -> .
+1 rule set -> component
 holding 1 rule set:
   Acme.Rules.Approval@1.0.0 ('Acme.Rules.Approval.json')
   …

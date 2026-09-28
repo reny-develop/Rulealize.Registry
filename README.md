@@ -62,7 +62,7 @@ way** — anything about the tools or the site belongs in an issue.
 
 ## The catalogue
 
-The ledger is what a person reviews. The catalogue is what the site and the resolver are
+The ledger is what a person reviews. The catalogue is what the site is
 generated from, and nobody reviews it — it is rebuilt from nuget.org on every run and is not
 in this repository.
 
@@ -194,9 +194,11 @@ build](doc/publish.md#a-rule-set) is a project file that compiles nothing:
 { "id": "Acme.Rules.Approval", "version": "1.0.0" }
 ```
 
-One document per package, because the identifier **is** the package — a package holding two
-documents is one where that stopped being true, and something would have to say which of them
-the name meant. As it stands nothing has to: a document that holds this one writes
+The identifier **is** the package, so exactly one document in it declares that identifier —
+that one is what a `uses` naming the package gets. A package may hold more beside it, and then
+they are the parts that one is built out of, each named under the package identifier; what the
+name means is never in doubt because only one document answers to it. A document that holds
+this one writes
 
 ```json
 "uses": [
@@ -249,9 +251,9 @@ the keys of a section the core reserves. There is no field a publisher fills in 
 themselves.
 
 **Nor a resolver.** Which versions are published and where the packages are is the feed's
-answer, and `rulealize restore` asks it directly — for a plugin today, and for a rule set on
-the same terms whenever it learns to. An index that had to be online for a restore to work
-would be a different sort of object than this one.
+answer, and `rulealize restore` asks it directly, for a plugin and for a rule set alike. An
+index that had to be online for a restore to work would be a different sort of object than
+this one.
 
 ## License
 
