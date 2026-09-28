@@ -16,7 +16,7 @@ using Rulealize.Abstraction.Plugin;
 //
 // A plugin is an assembly, and the validator is an ordinary host. It builds a RuleRuntime,
 // points LoadPluginsFrom at a folder, and reports what came back. It knows no plugin by name,
-// has no list of the standard twelve, and reads nothing beside the DLLs — so there is no way
+// has no list of the standard thirteen, and reads nothing beside the DLLs — so there is no way
 // for the ledger to describe a plugin differently from the way an application loading that
 // same folder would see it.
 //

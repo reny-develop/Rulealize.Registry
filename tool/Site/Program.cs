@@ -615,8 +615,9 @@ static string WithheldDocument(RuleSet ruleSet, RuleSetRelease release, string r
 {
     if (reason is not "claims" || release.Claimed is not Declared claimed)
     {
-        return "Nothing could be read out of this release — no <code>ruleset</code> folder, more than one "
-            + "document in it, or one the reader refused — so it is not in the index.";
+        return "Nothing could be read out of this release — no <code>ruleset</code> folder, nothing in "
+            + "it declaring the package's own identifier, or a document the reader refused — so it is not "
+            + "in the index.";
     }
 
     List<string> moved = [];
@@ -784,8 +785,9 @@ static async Task WriteFront(List<Plugin> plugins, List<RuleSet> ruleSets, strin
         // is in until somebody publishes the first one.
         body.Append("""
             <p class="meta">None yet. A rule set is published as a package whose <code>ruleset</code>
-            folder holds one document, and it is submitted the way a plugin is — one line naming the
-            package and the version its document was read at.
+            folder holds the document declaring the package's identifier, and any parts it is built out
+            of beside it. It is submitted the way a plugin is — one line naming the package and the
+            version its document was read at.
             <a href="https://github.com/reny-develop/Rulealize.Registry/blob/main/doc/publish.md">What to
             build</a>.</p>
             """);

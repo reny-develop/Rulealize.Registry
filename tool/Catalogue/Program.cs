@@ -184,9 +184,10 @@ foreach (JsonElement claim in ledger.RootElement.TryGetProperty("ruleSets", out 
         }
         catch (Exception failure) when (failure is not (HttpRequestException or TaskCanceledException))
         {
-            // A package with no `ruleset` folder, with more than one document in it, or with
-            // one the probe would not read. It is one publisher's upload and it withholds one
-            // version, rather than the index everybody else is in.
+            // A package with no `ruleset` folder, with nothing in it declaring the package's
+            // own identifier, or with a document the probe would not read. Several documents
+            // are not a fault: that is a rule set built out of parts. It is one publisher's
+            // upload and it withholds one version, rather than the index everybody else is in.
             Console.Error.WriteLine($"{id} {version} could not be read: {failure.Message}");
             entries.Add(RuleSetVersion.Unreadable(version));
             continue;
