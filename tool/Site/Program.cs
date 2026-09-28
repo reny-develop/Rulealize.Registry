@@ -707,10 +707,13 @@ static async Task WriteFront(List<Plugin> plugins, List<RuleSet> ruleSets, strin
 
     body.Append("<h2>What is claimed</h2>");
     body.Append("""
-        <p>A namespace and a shorthand character have exactly one owner across the whole ecosystem, and
-        the runtime refuses two plugins that claim one of either. That check runs when somebody assembles
-        a plugin folder — after both were published — so this table is the only place a collision can be
-        seen before it costs anything.</p>
+        <p>A namespace has exactly one owner across the whole ecosystem, and the runtime refuses two
+        plugins that claim one. That check runs when somebody assembles a plugin folder — after both were
+        published — so this table is the only place a collision can be seen before it costs anything.</p>
+        <p>A shorthand character is recorded here rather than owned. Two plugins may reserve one and load
+        together, and a rule set that would otherwise be ambiguous names the vocabulary it meant:
+        <code>"$state:board"</code>. The column is here so that whoever reserves one second knows what
+        they are walking into, not because anything will stop them.</p>
         """);
 
     body.Append("<table class=\"claims\"><thead><tr>");
