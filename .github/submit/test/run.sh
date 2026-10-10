@@ -139,7 +139,7 @@ body Plugin "$first" 9.9.9 other > "$work/again.md"
 bash "$here/../parse.sh" "$work/again.md" > "$work/again.json"
 bash "$here/../insert.sh" "$root/ledger/submitted.json" "$work/again.json" > "$work/again-head.json"
 output=$(bash "$here/../../admit/gate.sh" "$root/ledger/submitted.json" "$work/again-head.json" "$root/ledger/reserved.json")
-[[ $? -eq 1 && "$output" == *"one line per package"* ]]
+[[ $? -eq 1 && "$output" == *"already in the ledger"* ]]
 check refuses-a-package-already-in-the-ledger $? "$output"
 
 echo

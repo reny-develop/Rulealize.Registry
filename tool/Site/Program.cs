@@ -325,7 +325,7 @@ static async Task Write(string path, string title, string root, string body, str
         <head>
         <meta charset="utf-8">
         <meta name="viewport" content="width=device-width, initial-scale=1">
-        <title>{H(title)} — Rulealize Registry</title>
+        <title>{(title == "Rulealize Registry" ? H(title) : $"{H(title)} — Rulealize Registry")}</title>
         <link rel="stylesheet" href="{root}/style.css">
         </head>
         <body>

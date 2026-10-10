@@ -92,13 +92,14 @@ $(jq -r '.[] | tostring' <<<"$removed")
 
     # One line per package. A second line for one already in the ledger states nothing new —
     # it agrees with the same artifact the first one does, so nothing downstream would refuse
-    # it, and the catalogue would carry the entry twice.
+    # it, and the catalogue would carry the entry twice. Compared without regard to case,
+    # because nuget.org serves one package under every casing of its identifier.
     duplicated=$(jq -r --arg kind "$kind" \
-        '(.[$kind] // []) | map(.id) | group_by(.) | map(select(length > 1) | .[0]) | .[]' "$head" 2>/dev/null)
-    if [[ -n "$duplicated" ]]; then
-        fix "The ledger holds one line per package, and these are on more than one:
-$(sed 's/^/  - `/;s/$/`/' <<<"$duplicated")"
-    fi
+        '(.[$kind] // []) | map(.id) | group_by(ascii_downcase) | map(select(length > 1) | .[0]) | .[]' "$head" 2>/dev/null)
+    while IFS= read -r twice; do
+        [[ -z "$twice" ]] && continue
+        fix "\`$twice\` is already in the ledger, which holds one line per package. A later release needs no new submission — it is read every day."
+    done <<<"$duplicated"
 
     new=$(jq -c --slurpfile base "$base" --arg kind "$kind" \
         '(.[$kind] // []) - ($base[0][$kind] // []) | map(.kind = $kind)' "$head" 2>/dev/null)

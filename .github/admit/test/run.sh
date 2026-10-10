@@ -185,8 +185,14 @@ gate fixes-a-held-namespace fix "already holds" \
 # A second line for a package already in the ledger. It states nothing new — the assembly it
 # names agrees with it, so declared.sh has nothing to refuse — and the catalogue would carry
 # the plugin twice.
-gate fixes-a-duplicate fix "one line per package" \
+gate fixes-a-duplicate fix "already in the ledger" \
     <<<"$(jq --argjson e "$(submission Rulealize.Plugin.Binding bind '"@"' 2.0.0)" \
+        '.plugins = .plugins + [$e]' "$work/base.json")"
+
+# nuget.org serves one package under every casing of its identifier, so a second line that
+# differs only in case is the same package twice.
+gate fixes-a-duplicate-in-another-case fix "already in the ledger" \
+    <<<"$(jq --argjson e "$(submission rulealize.plugin.binding bind '"@"' 2.0.0)" \
         '.plugins = .plugins + [$e]' "$work/base.json")"
 
 # ── rule sets ──────────────────────────────────────────────────────────────────────
@@ -217,7 +223,7 @@ gate fixes-a-rule-set-out-of-order fix "identifier order" \
 gate fixes-a-rule-set-version fix "three-part version" \
     <<<"$(jq --argjson e "$(ruleset Acme.Rules.Approval 1.0)" "$holds" "$work/base.json")"
 
-gate fixes-a-rule-set-duplicate fix "one line per package" \
+gate fixes-a-rule-set-duplicate fix "already in the ledger" \
     <<<"$(jq --argjson e "$(ruleset Rulealize.RuleSet.Approval 2.0.0)" \
         '.ruleSets = .ruleSets + [$e]' "$work/base.json")"
 
