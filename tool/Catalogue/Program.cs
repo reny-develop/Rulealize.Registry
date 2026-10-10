@@ -10,7 +10,7 @@ using System.Text.Json;
 using System.Text.Unicode;
 using System.Xml.Linq;
 
-// Builds the catalogue the site and the resolver are generated from, and checks every
+// Builds the catalogue the site is generated from, and checks every
 // published version against what the ledger says was claimed.
 //
 //   dotnet run --project tool/Catalogue -- <ledger file> <probe> <output folder>
