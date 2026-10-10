@@ -172,14 +172,16 @@ dotnet pack -c Release
 dotnet nuget push bin/Release/Acme.Rules.Approval.1.0.0.nupkg --source nuget.org --api-key <key>
 ```
 
-Then [one line in the ledger](policy.md#a-rule-set), naming the package and the version its
-document was read at. CI fetches that package, reads the document inside it, and refuses the
-pull request if either string disagrees. Nothing about your `requires`, your `uses` or your
+Then submit it from the [submit page](https://reny-develop.github.io/Rulealize.Registry/submit/):
+the package and the version its document was read at, which become
+[one line in the ledger](policy.md#a-rule-set). The page reads the document out of the package
+before it sends anything, and CI reads it again and refuses the submission if either string
+disagrees. Nothing about your `requires`, your `uses` or your
 inputs is submitted — they are read.
 
 ### After that, a release costs nothing
 
-A new version of a rule set already in the ledger needs **no pull request**. Nothing committed
+A new version of a rule set already in the ledger needs **no new submission**. Nothing committed
 changes; the next scheduled run finds the release, reads it, and adds it to the entry.
 
 What that same run also does is check it. A release whose document declares a different

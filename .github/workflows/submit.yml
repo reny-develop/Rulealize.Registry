@@ -1,0 +1,297 @@
+# Reads a submission, and writes it into the ledger when its package says the same.
+#
+# A submission is an issue opened from the site's submit page, through the form in
+# .github/ISSUE_TEMPLATE/submit.yml. It states a package, a version and — for a plugin — the
+# two names it claims. This runs when it is opened and again whenever it is edited, so putting
+# a submission right is editing it, and nothing waits on anybody: the answer is a comment on
+# the issue, which GitHub sends to whoever opened it.
+#
+# Two jobs, because the two halves of this must never share a job.
+#
+#   read   builds the ledger the submission would make, from main and the one line it asks
+#          for, holds that line to gate.sh, then fetches every package that ledger names and
+#          loads them — exactly what ledger.yml does to main. Loading a plugin is running its
+#          code, so this job holds a read-only token and no secrets, and what it hands on is
+#          a verdict and the text of its answer.
+#
+#   answer posts the answer, and for a submission that agreed, writes the line. It holds the
+#          registry's GitHub App token, which can push to main, and it runs nothing out of any
+#          package: the line it writes is read again from the issue and held to gate.sh again,
+#          against main as it is at that moment, so two submissions read at the same time
+#          cannot both claim one namespace.
+#
+# The push is made with the App's token rather than GITHUB_TOKEN because a push made with
+# GITHUB_TOKEN starts no workflow, and the push is what makes ledger.yml check main and
+# catalogue.yml rebuild and publish the site. The App is the one actor that may push to main
+# without a pull request, which is what lets a submission land without anybody approving it.
+#
+# One reading per submission at a time. An edit made while a reading is still running cancels
+# it, because the reading it started is of text that is no longer there.
+
+name: submit
+
+on:
+  issues:
+    types: [opened, edited, reopened, labeled]
+
+concurrency:
+  group: submit-${{ github.event.issue.number }}
+  cancel-in-progress: true
+
+permissions: {}
+
+jobs:
+  read:
+    if: >
+      github.event.issue.state == 'open'
+      && contains(github.event.issue.labels.*.name, 'submission')
+      && (github.event.action != 'labeled' || github.event.label.name == 'submission')
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+
+    outputs:
+      verdict: ${{ steps.verdict.outputs.verdict }}
+
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - uses: actions/setup-dotnet@a98b56852c35b8e3190ac28c8c2271da59106c68 # v6.0.0
+        with:
+          dotnet-version: '10.0.x'
+
+      # The body is whatever the person who opened the issue wrote. It reaches the scripts as a
+      # file, through an environment variable, and is never put anywhere a shell would read it.
+      - name: Read the submission
+        env:
+          BODY: ${{ github.event.issue.body }}
+        run: |
+          set -uo pipefail
+          mkdir -p work
+          printf '%s' "$BODY" > work/body.md
+
+          if ! bash .github/submit/parse.sh work/body.md > work/parsed.json; then
+            mv work/parsed.json work/reasons.md
+            exit 0
+          fi
+
+          bash .github/submit/insert.sh ledger/submitted.json work/parsed.json > work/head.json
+          if ! bash .github/admit/gate.sh ledger/submitted.json work/head.json ledger/reserved.json > work/reasons.md; then
+            exit 0
+          fi
+          rm work/reasons.md
+
+      - name: Fetch the packages the ledger would name
+        if: hashFiles('work/reasons.md') == ''
+        run: |
+          set -uo pipefail
+          if ! bash .github/ledger/fetch.sh work/head.json work > work/reasons.md; then
+            exit 0
+          fi
+          rm work/reasons.md
+
+      # The same reading ledger.yml makes of main, of the ledger this submission would make.
+      # A collision with a plugin already admitted is the tool refusing the folder, and it
+      # says so as itself.
+      - name: Read what the packages claim
+        if: hashFiles('work/reasons.md') == ''
+        run: |
+          set -uo pipefail
+          if ! dotnet run --project tool/Ledger -- work/claimed work/claim.json > work/probe.log 2>&1; then
+            {
+              echo "The packages this ledger would name could not be loaded together:"
+              echo
+              echo '```'
+              tail -20 work/probe.log
+              echo '```'
+            } > work/reasons.md
+          fi
+
+      - name: Hold the line to its package
+        if: hashFiles('work/reasons.md') == ''
+        run: |
+          set -uo pipefail
+          if ! bash .github/admit/declared.sh work/head.json work/claim.json ledger/reserved.json > work/reasons.md; then
+            exit 0
+          fi
+          rm work/reasons.md
+
+      # What the answer says, written here because this is the job that read the package. The
+      # answer job posts it as text and takes nothing else from it but the verdict.
+      - name: Say what was found
+        id: verdict
+        run: |
+          set -euo pipefail
+          if [[ -f work/reasons.md ]]; then
+            {
+              echo "### ✕ Not recorded"
+              echo
+              cat work/reasons.md
+              echo
+              echo "Edit this issue to correct it — it is read again whenever the issue is saved. Nothing was recorded, and this issue stays open until it is put right or closed."
+            } > work/answer.md
+            echo "verdict=refused" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+
+          list=$(jq -r '.list' work/parsed.json)
+          id=$(jq -r '.entry.id' work/parsed.json)
+          version=$(jq -r '.entry.version' work/parsed.json)
+
+          if [[ "$list" == plugins ]]; then
+            jq -r --arg id "$id" --arg version "$version" '
+              .plugins[] | select(.id == $id) |
+              ([.operations[]] | add // []) as $ops |
+              "### ✓ Recorded — `\(.namespace)` now belongs to `\($id)`\n\n"
+              + "Read out of `\($id)` \($version):\n\n"
+              + "- namespace `\(.namespace)`, "
+              + (if .prefix == null then "no shorthand character" else "shorthand character `\(.prefix)`" end)
+              + ", manifest version \(.admitted) — as submitted\n"
+              + "- \($ops | length) operations: " + ($ops | map("`\(.)`") | join(", ")) + "\n\n"
+              + "The site shows it once the catalogue has been rebuilt, usually within a few minutes. "
+              + "Later releases need nothing from you — they are read every day."
+            ' work/claim.json > work/answer.md
+          else
+            jq -r --arg id "$id" --arg version "$version" '
+              .ruleSets[] | select(.id == $id) |
+              "### ✓ Recorded — `\($id)`\n\n"
+              + "Read out of `\($id)` \($version): the document declares `\($id)` at \(.admitted) — as submitted.\n\n"
+              + "- requires: " + (if (.requires | length) == 0 then "nothing" else (.requires | map("`\(.plugin)`") | join(", ")) end) + "\n"
+              + "- holds: " + (if (.uses | length) == 0 then "nothing" else (.uses | map("`\(.ruleSet)` as `\(.as)`") | join(", ")) end) + "\n"
+              + "- inputs: " + (if (.inputs | length) == 0 then "none" else (.inputs | map("`\(.)`") | join(", ")) end) + "\n\n"
+              + "The site shows it once the catalogue has been rebuilt, usually within a few minutes. "
+              + "Later releases need nothing from you — they are read every day."
+            ' work/claim.json > work/answer.md
+          fi
+          echo "verdict=recorded" >> "$GITHUB_OUTPUT"
+
+      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: answer
+          path: work/answer.md
+
+  answer:
+    needs: read
+    if: always() && needs.read.result != 'skipped' && needs.read.result != 'cancelled'
+    runs-on: ubuntu-latest
+    permissions: {}
+
+    steps:
+      # Scoped to what this job does: write the ledger, and answer on the issue.
+      - id: app
+        uses: actions/create-github-app-token@bcd2ba49218906704ab6c1aa796996da409d3eb1 # v3.2.0
+        with:
+          client-id: ${{ vars.REGISTRY_APP_CLIENT_ID }}
+          private-key: ${{ secrets.REGISTRY_APP_KEY }}
+          permission-contents: write
+          permission-issues: write
+
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          token: ${{ steps.app.outputs.token }}
+          fetch-depth: 0
+
+      - uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
+        if: needs.read.result == 'success'
+        with:
+          name: answer
+          path: work
+
+      # The line, read again from the issue rather than taken from the job that loaded the
+      # package, and held to main as it is now. Another submission may have landed since this
+      # one was read; if it took the same namespace, this one is refused rather than written.
+      - name: Write the line
+        id: write
+        if: needs.read.outputs.verdict == 'recorded'
+        env:
+          BODY: ${{ github.event.issue.body }}
+          NUMBER: ${{ github.event.issue.number }}
+          SLUG: ${{ steps.app.outputs.app-slug }}
+          GH_TOKEN: ${{ steps.app.outputs.token }}
+        run: |
+          set -euo pipefail
+          printf '%s' "$BODY" > work/body.md
+          bash .github/submit/parse.sh work/body.md > work/parsed.json
+          id=$(jq -r '.entry.id' work/parsed.json)
+          version=$(jq -r '.entry.version' work/parsed.json)
+
+          user_id=$(gh api "/users/${SLUG}%5Bbot%5D" --jq .id)
+          git config user.name "${SLUG}[bot]"
+          git config user.email "${user_id}+${SLUG}[bot]@users.noreply.github.com"
+
+          for attempt in 1 2 3 4 5; do
+            git fetch --quiet origin main
+            git checkout --quiet -B main origin/main
+
+            bash .github/submit/insert.sh ledger/submitted.json work/parsed.json > work/head.json
+            if ! bash .github/admit/gate.sh ledger/submitted.json work/head.json ledger/reserved.json > work/reasons.md; then
+              {
+                echo "### ✕ Not recorded"
+                echo
+                echo "Something was recorded while this was being read, and the ledger it would now make is not one this can be added to:"
+                echo
+                cat work/reasons.md
+                echo
+                echo "Edit this issue to correct it — it is read again whenever the issue is saved."
+              } > work/answer.md
+              echo "written=false" >> "$GITHUB_OUTPUT"
+              exit 0
+            fi
+
+            cp work/head.json ledger/submitted.json
+            git add ledger/submitted.json
+            git commit --quiet -m "Submit ${id} ${version}" -m "Closes #${NUMBER}"
+            if git push --quiet origin HEAD:main; then
+              echo "written=true" >> "$GITHUB_OUTPUT"
+              echo "commit=$(git rev-parse HEAD)" >> "$GITHUB_OUTPUT"
+              exit 0
+            fi
+          done
+
+          echo "::error::The ledger could not be pushed after five attempts."
+          exit 1
+
+      # One comment per submission, edited in place, so a submission edited six times does not
+      # carry six of them. A reading that broke is said as that, rather than as anything the
+      # submitter did; alert.yml tells the owner.
+      - name: Answer
+        if: always()
+        env:
+          GH_TOKEN: ${{ steps.app.outputs.token }}
+          NUMBER: ${{ github.event.issue.number }}
+          READ: ${{ needs.read.result }}
+          VERDICT: ${{ needs.read.outputs.verdict }}
+          WRITTEN: ${{ steps.write.outputs.written }}
+          COMMIT: ${{ steps.write.outputs.commit }}
+        run: |
+          set -euo pipefail
+          if [[ "$READ" != success || ( "$VERDICT" == recorded && -z "$WRITTEN" ) ]]; then
+            body="### Not read yet
+
+          Something on the registry's side went wrong while this was being read, and nothing was recorded. It has been reported; edit this issue, or wait, and it is read again."
+          else
+            body=$(cat work/answer.md)
+            if [[ "$WRITTEN" == true ]]; then
+              body="${body}
+
+          Recorded in ${COMMIT}."
+            fi
+          fi
+
+          marker='<!-- submit -->'
+          body="${marker}
+          ${body}"
+
+          existing=$(gh api --paginate "repos/${GITHUB_REPOSITORY}/issues/${NUMBER}/comments" \
+            --jq "[.[] | select(.body | startswith(\"${marker}\")) | .id] | last // empty" | tail -1)
+
+          if [[ -n "$existing" ]]; then
+            gh api -X PATCH "repos/${GITHUB_REPOSITORY}/issues/comments/${existing}" -f body="$body" >/dev/null
+          else
+            gh api -X POST "repos/${GITHUB_REPOSITORY}/issues/${NUMBER}/comments" -f body="$body" >/dev/null
+          fi
+
+          # After the comment, so the answer is on the issue before it shuts.
+          if [[ "$WRITTEN" == true ]]; then
+            gh api -X PATCH "repos/${GITHUB_REPOSITORY}/issues/${NUMBER}" -f state=closed -f state_reason=completed >/dev/null
+          fi

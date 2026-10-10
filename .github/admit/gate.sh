@@ -1,44 +1,28 @@
 #!/usr/bin/env bash
 #
-# Decides whether a pull request may merge without a person reading it, and — when it may not
-# — which person that is.
+# Decides whether a submission may be written into the ledger without a person reading it.
 #
 # Whether a submission is true is decided elsewhere, by fetching the package and loading it.
-# This decides a different question: whether the change is the *shape* a submission has. A
-# pull request that adds a line to the submitted list and touches nothing else has nothing
-# left for anybody to judge.
+# This decides a different question: whether the line it adds is one the ledger can hold —
+# a well-formed identifier and version, a name nobody else holds and the reserved list does
+# not refuse, in the place the order puts it, and nothing already there taken away. Whatever
+# it refuses is the submitter's to put right: they edit the submission and it is read again.
+# Nobody else has to be told, and nobody else can help.
 #
-# The rest split in two, and they are not the same thing:
-#
-#   - most of it is the submitter's to fix. A version in the wrong format, an entry out of
-#     order, a name somebody else may not have. They push a change and this runs again.
-#     Nobody else has to be told, and nobody else can help
-#   - the other is a pull request that is not a submission. This repository indexes plugins
-#     and rule sets and takes nothing else, so that one is closed with a note saying where
-#     to raise it
-#
-# Neither waits on anybody. Telling them apart is the whole reason this prints a verdict
-# rather than a yes or a no.
-#
-# It reads data and never runs any of it. The workflow calling it checks out the base branch
-# for this script and for the reserved list, so a pull request cannot edit either to admit
-# itself — and the first maintainer rule refuses that pull request anyway.
+# It reads data and never runs any of it. The workflow calling it builds the head ledger
+# itself, from main and the one line the submission asks for, so a submission cannot reach
+# this script, the reserved list or any other line of the ledger.
 #
 # The namespace and the shorthand character are read from what the submission states rather
 # than from the package, because finding out what a package really claims means loading it,
-# and this runs where a token that can merge is in the environment. A submission that states
-# something other than the truth is refused by declared.sh, in the job where no token is —
-# and a required check that fails is a pull request that never merges, which is the whole of
-# what this needs from it.
+# and this runs where a token that can write the ledger is in the environment. A submission
+# that states something other than the truth is refused by declared.sh, in the job where no
+# token is.
 #
-#   gate.sh <base submitted.json> <head submitted.json> <reserved.json> <changed files>
+#   gate.sh <base submitted.json> <head submitted.json> <reserved.json>
 #
-# Exit 0 admits and prints nothing. Exit 1 says this is not a submission and exit 3 says it is
-# one the submitter has to put right; both print the reasons as markdown, which the workflow
-# posts as the comment. Exit 2 is a usage error.
-#
-# BASE_REF and DRAFT come from the pull request; both default to the admitting case, so the
-# fixtures only set what they are testing.
+# Exit 0 admits and prints nothing. Exit 1 prints the reasons as markdown, which the workflow
+# posts as its answer. Exit 2 is a usage error.
 
 set -uo pipefail
 
@@ -47,74 +31,41 @@ if ! command -v jq >/dev/null; then
     exit 2
 fi
 
-if [[ $# -ne 4 ]]; then
-    echo "usage: gate.sh <base submitted.json> <head submitted.json> <reserved.json> <changed files>" >&2
+if [[ $# -ne 3 ]]; then
+    echo "usage: gate.sh <base submitted.json> <head submitted.json> <reserved.json>" >&2
     exit 2
 fi
 
 base=$1
 head=$2
 reserved=$3
-files=$4
-base_ref=${BASE_REF:-main}
-draft=${DRAFT:-false}
 
 policy=https://github.com/reny-develop/Rulealize.Registry/blob/main/doc/policy.md
 reserved_list=https://github.com/reny-develop/Rulealize.Registry/blob/main/ledger/reserved.json
 
 reasons=()
-elsewhere=0
 
-# Something the submitter can put right by pushing again.
 fix() { reasons+=("$1"); }
-
-# Not a submission, and this repository takes nothing else.
-close() { reasons+=("$1"); elsewhere=1; }
 
 verdict() {
     printf '%s\n\n' "${reasons[@]}"
-    [[ $elsewhere -eq 1 ]] && exit 1
-    exit 3
+    exit 1
 }
 
-# 1. The pull request itself.
-if [[ "$base_ref" != "main" ]]; then
-    fix "It does not target \`main\`, so what it would merge into is not the ledger."
-fi
-
-if [[ "$draft" == "true" ]]; then
-    fix "It is a draft."
-fi
-
-# 2. What it touches. An allowlist of one path: this repository indexes plugins and rule
-# sets and takes nothing else through a pull request, and the reserved list, the workflows
-# and the tools are all things this gate trusts — a change to any of them is a change to the
-# gate.
-changed=$(grep -v '^[[:space:]]*$' "$files" | sort -u)
-if [[ "$changed" != "ledger/submitted.json" ]]; then
-    close "It changes more than the submitted list:
-$(sed 's/^/  - `/;s/$/`/' <<<"$changed")"
-fi
-
-if [[ ! -s "$head" ]]; then
-    close "It leaves no \`ledger/submitted.json\`, and that file is the ledger."
-    verdict
-fi
-
-if ! jq -e . "$head" >/dev/null 2>&1; then
+if [[ ! -s "$head" ]] || ! jq -e . "$head" >/dev/null 2>&1; then
     fix "\`ledger/submitted.json\` is not valid JSON."
     verdict
 fi
 
 # The ledger is two lists — `plugins` and `ruleSets` — and an entry is shaped differently in
-# each. What a pull request may do to either is not different, so those rules are read once
+# each. What a submission may do to either is not different, so those rules are read once
 # below and the shape of an entry is read per kind after them.
 if ! jq -e '(.plugins | type == "array") and ((.ruleSets // []) | type == "array")' "$head" >/dev/null 2>&1; then
     fix "\`ledger/submitted.json\` could not be read as a submitted list."
     verdict
 fi
 
-# 3. Additions only. Every entry that was there has to still be there, unchanged, and this
+# Additions only. Every entry that was there has to still be there, unchanged, and this
 # compares the entries themselves rather than the lines they are written on — a submission
 # that sorts last moves the comma on the line above it, and that is punctuation rather than
 # somebody's claim going missing.
@@ -167,7 +118,7 @@ if [[ "$(jq 'length' <<<"$added")" -eq 0 ]]; then
     fix "It adds nothing."
 fi
 
-# 4. Each added line, against the parts of the policy that are decidable without a person.
+# Each added line, against the parts of the policy that are decidable without a person.
 while IFS= read -r entry; do
     [[ -z "$entry" ]] && continue
     kind=$(jq -r '.kind' <<<"$entry")
@@ -203,6 +154,16 @@ $(sed 's/^/  - `/;s/$/`/' <<<"$stated")"
 
     if [[ ! "$namespace" =~ ^[a-z][a-z0-9]*$ ]]; then
         fix "\`$id\` writes \`namespace\` as \`$namespace\`. A namespace is lowercase letters and digits, starting with a letter."
+    fi
+
+    # The runtime would refuse the pair once both were loaded, and the probe loads every plugin
+    # in the ledger together, so this is caught either way. It is said here as well because
+    # two submissions read at the same moment are each checked against a ledger without the
+    # other, and this is what is run again against the newest one before either is written.
+    holder=$(jq -r --arg id "$id" --arg ns "$namespace" \
+        '[.plugins[] | select(.namespace == $ns and .id != $id) | .id] | first // empty' "$head")
+    if [[ -n "$holder" ]]; then
+        fix "\`$id\` claims the namespace \`$namespace\`, which \`$holder\` already holds. A namespace has exactly one owner."
     fi
 
     if [[ "$prefix" != "null" && ${#prefix} -ne 1 ]]; then

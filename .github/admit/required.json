@@ -1,8 +1,0 @@
-{
-  "$schema": "rulealize/registry/admit/required/v1",
-  "checks": [
-    "build",
-    "cases",
-    "rederive"
-  ]
-}

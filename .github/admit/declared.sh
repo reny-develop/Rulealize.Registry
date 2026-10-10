@@ -15,8 +15,8 @@
 # executed, which makes it the one thing indexed here that this repository does not have to
 # say "loading is running" about.
 #
-# It runs where the plugin's code runs, which is the job with no token and no secrets. The
-# gate that can merge never sees a package, and never runs one.
+# It runs where the plugin's code runs, which is the job with no token and no secrets. The job
+# that can write the ledger never sees a package, and never runs one.
 #
 #   declared.sh <submitted.json> <derived claim.json> <reserved.json>
 #

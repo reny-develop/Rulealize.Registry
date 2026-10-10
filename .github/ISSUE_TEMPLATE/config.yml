@@ -1,0 +1,7 @@
+# An issue that is not a submission is about the tools, the site or the policy, and is
+# welcome as an ordinary issue.
+blank_issues_enabled: true
+contact_links:
+  - name: Submit a package from the registry's site
+    url: https://reny-develop.github.io/Rulealize.Registry/submit/
+    about: The submit page checks a package against nuget.org before it opens the form.
