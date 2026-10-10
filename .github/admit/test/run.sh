@@ -2,8 +2,8 @@
 #
 # The cases for both halves of admission.
 #
-# gate.sh decides whether a pull request is the shape a submission has, without loading
-# anything. declared.sh decides whether what it states is what its package claims, after
+# gate.sh decides whether the line a submission adds is one the ledger can hold, without
+# loading anything. declared.sh decides whether what it states is what its package claims, after
 # loading it. Every rule in each has a case that trips it, and both have an agreeing case
 # too, because a gate that never admits anything is the failure nobody notices.
 #
@@ -25,7 +25,6 @@ work=$(mktemp -d)
 trap 'rm -rf "$work"' EXIT
 
 cp "$here/base.json" "$work/base.json"
-printf 'ledger/submitted.json\n' > "$work/files.txt"
 
 passed=0
 failed=0
@@ -87,25 +86,18 @@ documents() {
     jq -n --argjson ruleSets "[$(printf '%s,' "$@" | sed 's/,$//')]" '{ plugins: [], ruleSets: $ruleSets }'
 }
 
-# gate <name> <admit|close|fix> [reason] — the head submitted list on standard input.
-# "close" means it is not a submission at all; "fix" is the submitter's own, and neither
-# waits on anybody.
+# gate <name> <admit|fix> [reason] — the head submitted list on standard input. "fix" is the
+# submitter's own to put right, and waits on nobody.
 gate() {
-    local name=$1 expect=$2 reason=${3:-} head="$work/head.json" files="$work/files.txt"
+    local name=$1 expect=$2 reason=${3:-} head="$work/head.json"
     cat > "$head"
 
-    if [[ -n "${FILES:-}" ]]; then
-        files="$work/files.${name}.txt"
-        printf '%s\n' "$FILES" > "$files"
-    fi
-
     local output status actual
-    output=$("$here/../gate.sh" "$work/base.json" "$head" "$here/reserved.json" "$files" 2>&1)
+    output=$("$here/../gate.sh" "$work/base.json" "$head" "$here/reserved.json" 2>&1)
     status=$?
     case $status in
         0) actual=admit ;;
-        1) actual=close ;;
-        3) actual=fix ;;
+        1) actual=fix ;;
         *) actual="error($status)" ;;
     esac
 
@@ -120,33 +112,6 @@ declared() {
 
     local output status actual
     output=$("$here/../declared.sh" "$work/submitted.json" "$work/derived.json" "$here/reserved.json" 2>&1)
-    status=$?
-    case $status in
-        0) actual=agrees ;;
-        1) actual=refuses ;;
-        *) actual="error($status)" ;;
-    esac
-
-    report "$name" "$expect" "$reason" "$actual" "$output"
-}
-
-# rules <contexts as json> — a branch's active rules, in the shape the API answers with
-rules() {
-    jq -nc --argjson contexts "$1" \
-        '[ { type: "deletion" },
-           { type: "pull_request", parameters: { required_approving_review_count: 0 } },
-           { type: "required_status_checks",
-             parameters: { required_status_checks: ($contexts | map({ context: . })) } } ]'
-}
-
-# required <name> <agrees|refuses> <required json> <rules json> [reason]
-required() {
-    local name=$1 expect=$2 reason=${5:-}
-    printf '%s\n' "$3" > "$work/required.json"
-    printf '%s\n' "$4" > "$work/rules.json"
-
-    local output status actual
-    output=$("$here/../required.sh" "$work/required.json" "$work/rules.json" 2>&1)
     status=$?
     case $status in
         0) actual=agrees ;;
@@ -197,15 +162,6 @@ gate fixes-a-reserved-prefix fix "reserved prefix" \
 gate fixes-a-long-prefix fix "one character or none" \
     <<<"$(jq --argjson e "$(submission Acme.Deploy.Rules acme '"!!"')" "$insert" "$work/base.json")"
 
-FILES=$'ledger/submitted.json\ntool/Ledger/Program.cs' \
-    gate closes-another-file close "more than the submitted list" \
-    <<<"$(jq --argjson e "$acme" "$insert" "$work/base.json")"
-
-FILES='ledger/reserved.json' \
-    gate closes-the-reserved-list close "more than the submitted list" \
-    <<<"$(jq --argjson e "$acme" "$insert" "$work/base.json")"
-
-# Everything below is the submitter's own to put right, and reaches nobody else.
 gate fixes-out-of-order fix "identifier order" \
     <<<"$(jq --argjson e "$(submission Zeta.Rules zeta null)" "$insert" "$work/base.json")"
 
@@ -222,6 +178,9 @@ gate fixes-a-bad-namespace fix "lowercase letters and digits" \
     <<<"$(jq --argjson e "$(submission Acme.Deploy.Rules Acme null)" "$insert" "$work/base.json")"
 
 gate fixes-nothing-added fix "adds nothing" < "$work/base.json"
+
+gate fixes-a-held-namespace fix "already holds" \
+    <<<"$(jq --argjson e "$(submission Acme.Deploy.Rules math null)" "$insert" "$work/base.json")"
 
 # A second line for a package already in the ledger. It states nothing new — the assembly it
 # names agrees with it, so declared.sh has nothing to refuse — and the catalogue would carry
@@ -276,23 +235,7 @@ gate fixes-a-straddling-package fix "one or the other" \
 
 gate fixes-broken-json fix "not valid JSON" <<<'{ "plugins": ['
 
-# The file itself, gone. Every claim in the ledger goes with it, so this is not a submission
-# with a mistake in it.
-gate closes-a-deletion close "leaves no" < /dev/null
-
-BASE_REF=release \
-    gate fixes-another-base fix "does not target" \
-    <<<"$(jq --argjson e "$acme" "$insert" "$work/base.json")"
-
-DRAFT=true \
-    gate fixes-a-draft fix "is a draft" \
-    <<<"$(jq --argjson e "$acme" "$insert" "$work/base.json")"
-
-# Both at once — a version in the wrong format on a pull request that also changes something
-# else. Closing wins: fixing the version would not make this a submission.
-FILES=$'ledger/submitted.json\nREADME.md' \
-    gate closes-both-at-once close "more than the submitted list" \
-    <<<"$(jq --argjson e "$(submission Acme.Deploy.Rules acme null 1.0)" "$insert" "$work/base.json")"
+gate fixes-an-empty-ledger fix "not valid JSON" < /dev/null
 
 echo
 echo "declared:"
@@ -388,43 +331,6 @@ declared agrees-with-both-kinds agrees \
         '{ plugins: $p, ruleSets: $r }')" \
     "$(jq -n --argjson p "[$(derived Acme.Deploy.Rules acme null)]" \
         --argjson r "[$(document Acme.Rules.Approval)]" '{ plugins: $p, ruleSets: $r }')"
-
-echo
-echo "required:"
-
-must=$(jq -nc '{ checks: ["build", "cases", "rederive"] }')
-
-required agrees-with-the-branch agrees "$must" "$(rules '["build", "cases", "rederive"]')"
-
-# A branch may require more than a submission is admitted on. This says what has to be there.
-required agrees-with-more agrees "$must" "$(rules '["build", "cases", "rederive", "codeql"]')"
-
-required refuses-one-missing refuses "$must" "$(rules '["build", "cases"]')" \
-    '`rederive` is not a required status check'
-
-required refuses-no-status-rule refuses "$must" '[{ "type": "deletion" }]' \
-    "requires no status check"
-
-required refuses-no-rules refuses "$must" '[]' "requires no status check"
-
-# Anything that is not a list of rules is the branch answering something else, and it is not
-# evidence that a check is required.
-required refuses-another-answer refuses "$must" '{ "message": "Not Found" }' \
-    "did not answer with a list of rules"
-
-# The other end of the same list. A context no job reports under is one auto-merge waits on
-# for ever, which is a submission that never merges rather than one that merges too early.
-while IFS= read -r check; do
-    check=${check%$'\r'}
-    [[ -z "$check" ]] && continue
-    if grep -qE "^  ${check}:[[:space:]]*$" "$here/../../workflows/"*.yml; then
-        printf '  ok    %-26s %s\n' "names-a-job" "$check"
-        passed=$((passed + 1))
-    else
-        printf '  FAIL  %-26s `%s` is a job in no workflow\n' "names-a-job" "$check"
-        failed=$((failed + 1))
-    fi
-done < <(jq -r '.checks[]' "$here/../required.json")
 
 echo
 if [[ $failed -gt 0 ]]; then

@@ -48,71 +48,15 @@ jobs:
         with:
           dotnet-version: '10.0.x'
 
-      # One project referencing exactly the plugin packages the ledger names, published so that
-      # the assemblies land in one folder. What else lands there does not matter:
-      # LoadPluginsFrom sweeps a folder and passes over assemblies with no plugin in them,
-      # which is why pointing it at an application's own output is a reasonable thing to do.
-      - name: Fetch the plugin packages the ledger names
+      # Every package the ledger names, in one folder, the way a deployment holds them. The
+      # script is shared with submit.yml, which points it at the ledger a submission would make.
+      - name: Fetch the packages the ledger names
         run: |
           set -euo pipefail
-          mkdir -p work
-          dotnet new classlib -o work/Fetch --framework net10.0 > /dev/null
-          jq -r '.plugins[] | "\(.id) \(.version)"' ledger/submitted.json | while read -r id version; do
-            echo "::group::${id} ${version}"
-            dotnet add work/Fetch package "${id}" --version "${version}"
-            echo "::endgroup::"
-          done
-          dotnet publish work/Fetch -c Release -o work/claimed
-
-      # A rule set package carries no assembly, so `dotnet publish` has nothing to copy out of
-      # one. It is fetched and unzipped instead, which is the same two operations with the
-      # framework's part left out — and it lands in the same folder, because the probe reads
-      # one folder and a deployment holds both kinds in one place too.
-      #
-      # The document is renamed to the package it came out of. It is a rule set's identifier
-      # that has one owner, not its file name, so two packages may both ship `rules.json` and
-      # neither is wrong — and the identifier inside is exactly what is being checked, so it
-      # cannot be what the file is named by here.
-      - name: Fetch the rule set packages the ledger names
-        run: |
-          set -euo pipefail
-          feed=https://api.nuget.org/v3-flatcontainer
-          jq -r '(.ruleSets // [])[] | "\(.id) \(.version)"' ledger/submitted.json | while read -r id version; do
-            echo "::group::${id} ${version}"
-            lower=$(tr '[:upper:]' '[:lower:]' <<<"$id")
-            curl -sSfL -o "work/${id}.nupkg" "${feed}/${lower}/${version}/${lower}.${version}.nupkg"
-
-            rm -rf work/one && mkdir -p work/one
-
-            # -C matches the folder without regard to case, because the catalogue does and the
-            # two have to agree. A package that is indexed daily and cannot be admitted here is
-            # worse than either answer would have been on its own.
-            #
-            # A failure is swallowed, because unzip's is "no matching files" — which is what the
-            # count below says, and says better: with a package identifier and a version in it.
-            unzip -o -j -C "work/${id}.nupkg" 'ruleset/*.json' -d work/one || true
-
-            # At least one, and which of them is which is not this step's to decide. A package
-            # ships the document named for it and, where that one is built out of parts, those
-            # parts too — the way a library's internal types ship in its assembly rather than
-            # in packages of their own. What each one declares is read by the probe, and
-            # declared.sh holds the set to the rule: one entry point, and every other
-            # identifier under it.
-            found=$(find work/one -name '*.json' | wc -l)
-            if [[ "$found" -eq 0 ]]; then
-              echo "::error file=ledger/submitted.json::${id} ${version} holds no document in \`ruleset\`."
-              exit 1
-            fi
-
-            # Numbered rather than named for the identifier, because the identifier is what is
-            # being checked and a file named for a claim would be this step believing it.
-            n=0
-            for document in work/one/*.json; do
-              n=$((n + 1))
-              mv "$document" "work/claimed/${id}.${n}.json"
-            done
-            echo "::endgroup::"
-          done
+          if ! reason=$(bash .github/ledger/fetch.sh ledger/submitted.json work); then
+            echo "::error file=ledger/submitted.json::${reason}"
+            exit 1
+          fi
 
       # A folder whose plugins cannot be loaded together is a collision, and the tool reports
       # it as itself. So is a folder where two documents declare one identifier. Moving either

@@ -1,232 +1,39 @@
-# Merges a submission that has nothing left for a person to decide, and tells the person when
-# it does.
+# Answers a pull request that is not the owner's.
 #
-# Everything a submission can get wrong about its own claims is already decided by ledger.yml,
-# which fetches the package and loads it. This decides a different question: whether the
-# change is the shape a submission has. A pull request that adds one line to the submitted
-# list and touches nothing else has no judgement left in it, so it merges when the checks
-# pass.
+# A submission is not a pull request. It is made from the site's submit page, which opens an
+# issue, and submit.yml reads it and writes the ledger — so nobody outside this repository
+# has a reason to open one, and nothing that arrives as one is merged. A pull request that is
+# not the owner's is answered with where a submission is made, and where anything else is
+# raised, and closed: nothing is lost, and it waits on nobody.
 #
-# What is left over never waits on anybody. A submission with something wrong in it says so on
-# the pull request and is the submitter's to push again; a pull request that is not a
-# submission is closed, because this repository indexes plugins and rule sets and takes
-# nothing else that way. Nothing is labelled, nobody is assigned, and no notification is owed
-# to a maintainer who has nothing to decide.
-#
-# pull_request_target runs this file as it is on main, with a token that can merge — so the
-# gate reads the pull request as data and never runs a line of it. The only thing that comes
-# out of the pull request is JSON, read with `git show` and handed to jq.
-#
-# Auto-merge merges on the checks the branch requires, and which those are is a setting rather
-# than a file in this repository. .github/admit/required.sh reads it at the moment this relies
-# on it, so a branch that has stopped requiring them holds the submission instead of admitting
-# it.
-#
-# The rules themselves are in .github/admit/gate.sh, with a case for each in
-# .github/admit/test/. They are not written here, because a rule nobody can run locally is a
-# rule nobody can test.
+# pull_request_target runs this file as it is on main, with a token that can close the pull
+# request, and it never reads a line of what the pull request contains.
 
 name: admit
 
 on:
   pull_request_target:
-    types: [opened, synchronize, reopened, ready_for_review]
+    types: [opened, reopened]
 
 permissions:
-  contents: write
   pull-requests: write
 
 jobs:
-  gate:
+  answer:
+    if: github.event.pull_request.user.login != github.repository_owner
     runs-on: ubuntu-latest
 
     steps:
-      # The base branch, which is where gate.sh and the reserved list are read from. A
-      # submission cannot edit either to admit itself — and rule 2 refuses it for trying.
-      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-        with:
-          fetch-depth: 0
-
-      - name: Read the pull request
+      - name: Answer it, and close it
         env:
           GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
           PR: ${{ github.event.pull_request.number }}
-          BASE: ${{ github.event.pull_request.base.ref }}
         run: |
           set -euo pipefail
-          mkdir -p work
-          git fetch --no-tags --quiet origin "refs/pull/${PR}/head"
+          body="This repository takes no submissions through a pull request. A plugin or a rule set is submitted from the [registry's submit page](https://reny-develop.github.io/Rulealize.Registry/submit/), which checks the package against nuget.org and opens the submission for you — and anything about the tools, the site or the policy belongs in an [issue](https://github.com/${GH_REPO}/issues).
 
-          # The merge base rather than the tip of main: a submission opened before something
-          # else merged has not removed what it never had.
-          merge_base=$(git merge-base "origin/${BASE}" FETCH_HEAD)
-          git show "${merge_base}:ledger/submitted.json" > work/base.json
-          git show "FETCH_HEAD:ledger/submitted.json" > work/head.json 2>/dev/null || : > work/head.json
+          Closing this one — nothing is lost."
 
-          gh api --paginate "repos/${GITHUB_REPOSITORY}/pulls/${PR}/files" --jq '.[].filename' > work/files.txt
-
-      - name: Decide
-        id: gate
-        env:
-          BASE_REF: ${{ github.event.pull_request.base.ref }}
-          DRAFT: ${{ github.event.pull_request.draft }}
-        run: |
-          set +e
-          reasons=$(bash .github/admit/gate.sh work/base.json work/head.json ledger/reserved.json work/files.txt)
-          status=$?
-          set -e
-
-          # Exit 2 is the gate failing rather than refusing. It leaves the pull request
-          # unmerged and this job red, which is the right way round.
-          if [[ $status -eq 2 ]]; then
-            echo "::error::The gate could not run."
-            echo "$reasons"
-            exit $status
-          fi
-
-          case $status in
-            0) verdict=admit ;;
-            1) verdict=close ;;
-            *) verdict=fix ;;
-          esac
-
-          echo "verdict=${verdict}" >> "$GITHUB_OUTPUT"
-          {
-            echo 'reasons<<GATE_EOF'
-            echo "$reasons"
-            echo 'GATE_EOF'
-          } >> "$GITHUB_OUTPUT"
-
-      # What auto-merge would hold this to. Turning it on merges the moment the *required*
-      # checks pass, and which checks those are is a branch setting rather than a file here —
-      # so it is read at the moment it is relied on and held to .github/admit/required.json.
-      # A branch that requires nothing would otherwise merge a submission before its package
-      # had been fetched, and nothing in this repository would have said so.
-      - name: Check what main requires
-        id: required
-        if: steps.gate.outputs.verdict == 'admit'
-        env:
-          GH_TOKEN: ${{ github.token }}
-        run: |
-          set +e
-          gh api "repos/${GITHUB_REPOSITORY}/rules/branches/main" > work/rules.json
-          if [[ $? -ne 0 ]]; then
-            reasons='`main` could not be asked what it requires.'
-            status=1
-          else
-            reasons=$(bash .github/admit/required.sh .github/admit/required.json work/rules.json)
-            status=$?
-          fi
-          set -e
-
-          # Exit 2 is the check failing rather than refusing, and it leaves the pull request
-          # unmerged and this job red, which is the right way round.
-          if [[ $status -eq 2 ]]; then
-            echo "::error::What main requires could not be read."
-            echo "$reasons"
-            exit $status
-          fi
-
-          if [[ $status -eq 0 ]]; then
-            echo "ok=true" >> "$GITHUB_OUTPUT"
-          else
-            echo "ok=false" >> "$GITHUB_OUTPUT"
-          fi
-
-          {
-            echo 'reasons<<REQUIRED_EOF'
-            echo "$reasons"
-            echo 'REQUIRED_EOF'
-          } >> "$GITHUB_OUTPUT"
-
-      - name: Act on it
-        env:
-          GH_TOKEN: ${{ github.token }}
-          PR: ${{ github.event.pull_request.number }}
-          VERDICT: ${{ steps.gate.outputs.verdict }}
-          REASONS: ${{ steps.gate.outputs.reasons }}
-          REQUIRED_OK: ${{ steps.required.outputs.ok }}
-          REQUIRED_REASONS: ${{ steps.required.outputs.reasons }}
-          OWNER: ${{ github.repository_owner }}
-          AUTHOR: ${{ github.event.pull_request.user.login }}
-          DRY_RUN: ${{ vars.ADMIT_DRY_RUN }}
-        run: |
-          set -euo pipefail
-
-          # Auto-merge survives a force-push, so a pull request that was admitted and has
-          # since changed has to have it taken away again — and so does one admitted while
-          # main still required the checks it would have merged on.
-          if [[ "$VERDICT" != "admit" || "$REQUIRED_OK" != "true" ]]; then
-            gh pr merge "$PR" --disable-auto 2>/dev/null || true
-          fi
-
-          case "$VERDICT" in
-            admit)
-              if [[ "$REQUIRED_OK" != "true" ]]; then
-                body="This is a submission and touches nothing else. Auto-merge is not being turned on, because what it would merge on is not what a submission is admitted on here:
-
-          ${REQUIRED_REASONS}
-
-          Nothing about this pull request is wrong, and nothing about it is yours to change. It waits."
-              elif [[ "$DRY_RUN" == "true" ]]; then
-                body="This is a submission and touches nothing else, so it would merge as soon as the checks pass. Auto-merge is not enabled yet: the gate is in dry run while it is watched."
-              else
-                gh pr merge "$PR" --auto --squash
-                body="This is a submission and touches nothing else, so there is nothing here for a person to decide. It merges as soon as the checks pass — every entry is derived from the package you named, and that is what decides whether what you wrote is true."
-              fi
-              ;;
-
-            # The submitter's own to put right. Nobody else is told: they push a change and
-            # this runs again.
-            fix)
-              body="Not a submission yet. Push a change and this comment answers again.
-
-          ${REASONS}"
-              ;;
-
-            # Not a submission at all. This repository indexes plugins and rule sets and takes
-            # nothing else through a pull request, so it is closed rather than left open for
-            # somebody who is never coming — the exception being the owner, whose changes to
-            # the tools arrive this way on purpose.
-            close)
-              body="This repository takes submissions to [\`ledger/submitted.json\`](https://github.com/${GITHUB_REPOSITORY}/blob/main/ledger/submitted.json) and nothing else through a pull request. Anything about the tools, the site or the policy belongs in an [issue](https://github.com/${GITHUB_REPOSITORY}/issues).
-
-          ${REASONS}"
-
-              if [[ "$AUTHOR" != "$OWNER" ]]; then
-                body="${body}
-          Closing this one — nothing is lost, and an issue is the place for it."
-              fi
-              ;;
-          esac
-
-          # One comment per pull request, edited in place, so a branch pushed six times does
-          # not leave six of these.
-          marker='<!-- admit -->'
-          body="${marker}
-          ${body}"
-
-          # --jq runs once per page, so the tail is what keeps this one identifier rather than
-          # one per page on a pull request long enough to have several.
-          existing=$(gh api --paginate "repos/${GITHUB_REPOSITORY}/issues/${PR}/comments" \
-            --jq "[.[] | select(.body | startswith(\"${marker}\")) | .id] | last // empty" | tail -1)
-
-          if [[ -n "$existing" ]]; then
-            gh api -X PATCH "repos/${GITHUB_REPOSITORY}/issues/comments/${existing}" -f body="$body" >/dev/null
-          else
-            gh api -X POST "repos/${GITHUB_REPOSITORY}/issues/${PR}/comments" -f body="$body" >/dev/null
-          fi
-
-          # After the comment, so that the reason is on the pull request before it shuts.
-          if [[ "$VERDICT" == "close" && "$AUTHOR" != "$OWNER" ]]; then
-            gh pr close "$PR"
-          fi
-
-      # After the comment, for the same reason. A submission held by the branch rather than by
-      # itself is nobody's to push a change to, so this is the one thing here that is red at
-      # the repository rather than at whoever opened the pull request.
-      - name: Say that the branch is where this stopped
-        if: steps.required.outputs.ok == 'false'
-        run: |
-          echo "::error::main does not require the checks a submission is admitted on. See .github/admit/required.json."
-          exit 1
+          gh pr comment "$PR" --body "$body"
+          gh pr close "$PR"

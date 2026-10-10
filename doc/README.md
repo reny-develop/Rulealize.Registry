@@ -6,7 +6,7 @@
 | [Publishing to this index](publish.md) | what to build, so that a submission has something true to say |
 
 The first is binding. It is what a submission is held to, and it is written to be read by the
-person about to open the pull request rather than by whoever maintains this repository.
+person about to submit rather than by whoever maintains this repository.
 
 The second is not binding and holds no rule of its own — every constraint in it is the
 policy's, linked where it appears. It exists because a rule set is distributed as a package

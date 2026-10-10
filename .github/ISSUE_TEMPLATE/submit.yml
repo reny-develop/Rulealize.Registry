@@ -1,0 +1,53 @@
+# The form a submission is made through. The site's submit page opens it with every field
+# filled in from the URL, so the person submitting presses one button.
+#
+# The labels below are the headings .github/submit/parse.sh reads the answers under, and the
+# ids are the query parameters the submit page fills them by. Change one and change the other.
+
+name: Submit a package
+description: Claim the names a package on nuget.org uses. Opened from the registry's submit page.
+title: "Submit "
+labels: [submission]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Opened from the [registry's submit page](https://reny-develop.github.io/Rulealize.Registry/submit/). The result is posted here, and GitHub notifies you.
+
+        Everything below is read again out of the package itself. A claim is permanent.
+  - type: dropdown
+    id: kind
+    attributes:
+      label: Kind
+      options:
+        - Plugin
+        - Rule set
+    validations:
+      required: true
+  - type: input
+    id: package
+    attributes:
+      label: Package identifier
+      placeholder: Acme.Plugin.Dice
+    validations:
+      required: true
+  - type: input
+    id: version
+    attributes:
+      label: Version
+      description: A version already published on nuget.org. Your claims are read at this one.
+      placeholder: 1.0.0
+    validations:
+      required: true
+  - type: input
+    id: namespace
+    attributes:
+      label: Namespace
+      description: A plugin's namespace. Leave empty for a rule set.
+      placeholder: dice
+  - type: input
+    id: shorthand
+    attributes:
+      label: Shorthand character
+      description: One character, or (none). Leave empty for a rule set.
+      placeholder: (none)

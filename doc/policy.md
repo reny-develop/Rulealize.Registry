@@ -333,8 +333,12 @@ for one claim and one meaning: CI reproduced this package from its tagged source
 
 ## How to claim
 
-Open a pull request adding one line to [`ledger/submitted.json`](../ledger/submitted.json), in
-identifier order, to the list for what you are submitting.
+Submit it from the [submit page](https://reny-develop.github.io/Rulealize.Registry/submit/).
+It asks for the package, the version, and — for a plugin — the two names it claims; it checks
+them against nuget.org and against what is already claimed; and it opens an issue on this
+repository with every field filled in, which you send with one click. What that issue asks for
+is one line in [`ledger/submitted.json`](../ledger/submitted.json), in the list for what you
+are submitting, and the line is what this section describes.
 
 ### A plugin
 
@@ -359,8 +363,8 @@ worth being able to see was made. It is recorded rather than granted — another
 already carry the same character, and that is not something this registry has an opinion
 about.
 
-**Nothing you state is believed.** CI fetches the package, loads it, and refuses the pull
-request if the assembly says anything other than what the line says — a different namespace, a
+**Nothing you state is believed.** CI fetches the package, loads it, and refuses the
+submission if the assembly says anything other than what the line says — a different namespace, a
 shorthand character you did not declare, a manifest version that is not the one it was fetched
 at, or a `PluginManifest.Id` that is not the package you named. You cannot record a claim your
 plugin does not make, and there is no field here you can fill in wrongly and be believed.
@@ -404,33 +408,35 @@ document**, never off its name — a file gets renamed and an identifier does no
 rule Rulealize.Cli already resolves a held rule set by.
 
 **Nothing you state is believed here either.** CI fetches the package, reads the document, and
-refuses the pull request if it declares an identifier that is not the package you named or a
+refuses the submission if it declares an identifier that is not the package you named or a
 version that is not the one it was fetched at. Your `requires`, your `uses`, your inputs and
 everything else about the document are read, never asked for.
 
-## What happens to your pull request
+## What happens to your submission
 
-**A submission that adds one line and touches nothing else merges when the checks pass.**
-Nobody reads it first. There is nothing left to read: the package is fetched and read, every
-word of the line is held to what it says, and a plugin claim that collides with one already
-made cannot be loaded beside it. Whether the claim is true is not an opinion anybody here
-holds.
+**A submission whose package says the same as the submission is recorded.** Nobody reads it
+first. There is nothing left to read: the package is fetched and read, every word of the line
+is held to what it says, and a plugin claim that collides with one already made cannot be
+loaded beside it. Whether the claim is true is not an opinion anybody here holds. The line is
+written into the ledger, the issue is answered and closed, and the site shows the entry once
+the catalogue has been rebuilt — usually within a few minutes. GitHub notifies you of the
+answer.
 
-What stops one is always one of two things, and **neither of them waits on anybody**.
+What stops one is **yours to put right, and waits on nobody**. A version that is not three
+parts or is not published, a namespace that is not lowercase or that somebody already holds, a
+[reserved](../ledger/reserved.json) name or character, a rule set stating a namespace, a
+package already in the ledger, or a package that says something other than the submission.
+The reason is written on the issue; you edit the issue, and it is read again. Nobody else is
+told, because nobody else could have helped. Two submissions read at the same moment are held
+to the ledger as it is when each is written, so the second to claim a namespace is refused
+rather than recorded.
 
-**Yours to put right.** A version that is not three parts, an entry out of order, a namespace
-that is not lowercase, a [reserved](../ledger/reserved.json) name or character, a rule set
-entry stating more than its two fields, one package on both lists, a line somebody else's
-claim was on, a draft. The reason is written on the pull request, you push a change, and it is
-answered again. Nobody else is told, because nobody else could have helped.
+Nothing else is refused. A namespace that is not your vendor's — `Acme.Deploy.Rules` claiming
+`deploy` — is recorded. So is a shorthand character somebody else already reserved, which is
+not even a collision: it costs the rule sets that write it a namespace in front, and nothing
+else.
 
-**Not a submission.** A pull request that changes anything besides `ledger/submitted.json` is
-closed. That is not a judgement about the change — this repository indexes plugins and rule
-sets and takes nothing else this way, and an
+**A pull request is not a submission.** One that is not the owner's is answered with where
+submissions are made, and closed. That is not a judgement about the change — an
 [issue](https://github.com/reny-develop/Rulealize.Registry/issues) is where anything about the
 tools, the site or this document belongs.
-
-Nothing else is on either list. A namespace that is not your vendor's —
-`Acme.Deploy.Rules` claiming `deploy` — merges. So does a shorthand character somebody else
-already reserved, which is not even a collision: it costs the rule sets that write it a
-namespace in front, and nothing else.

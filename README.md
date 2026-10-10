@@ -5,10 +5,9 @@ plugin provides an operation, which versions satisfy a rule set's `requires`, wh
 are already spoken for, which shorthand characters are in use by whom, and which published
 rule sets a `uses` can name.
 
-> **Status — early.** What exists is the claim ledger, the tools that check it and build the
-> catalogue from it, the jobs that hold a pull request to both, and the site — which is
-> [up](https://reny-develop.github.io/Rulealize.Registry/), labelled pre-release. Nothing
-> has been submitted from outside the project yet.
+> **Open for submissions.** A plugin or a rule set is submitted from the
+> [submit page](https://reny-develop.github.io/Rulealize.Registry/submit/), and recorded without
+> anybody approving it once its package says the same as the submission.
 
 ## The ledger
 
@@ -47,18 +46,23 @@ It knows nothing by name and holds no list of anything.
 ledger names, reads it, and refuses anything that says one thing where the package says
 another — a namespace, a shorthand character or a version that is not the assembly's, an
 identifier or a version that is not the document's, or a package published under a name that
-neither declares. A pull request may state a claim; that job is what decides whether it is
+neither declares. A submission may state a claim; that job is what decides whether it is
 true.
 
-Which is why **a submission that adds one line and touches nothing else merges without anybody
-reading it**. [`admit.yml`](.github/workflows/admit.yml) checks that it is that and no more —
-the rules are in [`.github/admit/gate.sh`](.github/admit/gate.sh), one case each in
-[`.github/admit/test/`](.github/admit/test/) — and then waits for the checks. What it will not
-admit waits on nobody either: a submission with something wrong in it says so on the pull
-request and is the submitter's to push again, and a pull request that is not a submission is
-closed, because **this repository indexes plugins and rule sets and takes nothing else that
-way** — anything about the tools or the site belongs in an issue.
-[The grant policy](doc/policy.md#what-happens-to-your-pull-request) says which is which.
+Which is why **a submission is recorded without anybody reading it**. It is made on the
+[submit page](https://reny-develop.github.io/Rulealize.Registry/submit/), which checks the
+package against nuget.org and opens an issue with every field filled in.
+[`submit.yml`](.github/workflows/submit.yml) reads that issue, builds the ledger it would make —
+main and one line — holds the line to [`.github/admit/gate.sh`](.github/admit/gate.sh), loads
+every package that ledger names exactly as `ledger.yml` does, and when they agree, writes the
+line into the ledger and answers on the issue. One that does not agree waits on nobody either:
+the answer says what is wrong, and editing the issue reads it again. The cases are in
+[`.github/admit/test/`](.github/admit/test/) and [`.github/submit/test/`](.github/submit/test/).
+
+**This repository takes no submissions through a pull request.** One that is not the owner's
+is answered with where submissions are made and closed — anything about the tools or the site
+belongs in an issue. [The grant policy](doc/policy.md#what-happens-to-your-submission) says
+what is refused, and why.
 
 ## The catalogue
 
@@ -80,7 +84,7 @@ dotnet run --project tool/Catalogue -- ledger/submitted.json work/probe/Rulealiz
 The ledger holds one line per package because [a claim is permanent](doc/policy.md#a-claim-is-permanent);
 the catalogue holds one entry per version because `requires` and `uses` read `^1.0` and what a
 release offers may grow within a major. **So a new version of anything already admitted needs
-no pull request** — nothing committed changes, and the next scheduled run picks it up.
+no new submission** — nothing committed changes, and the next scheduled run picks it up.
 
 What that would otherwise let through is a package renaming itself quietly between releases: a
 plugin moving its namespace, a rule set moving the identifier its document declares.
@@ -155,9 +159,11 @@ none to the catalogue's code — so the pages are a view of those files rather t
 path to the same facts. The search on the front page fetches `index.json` from beside the
 page.
 
-**It is up**: <https://reny-develop.github.io/Rulealize.Registry/>. It carries `noindex` and
-says pre-release in its header, because nothing has been submitted to it from outside the
-project yet.
+**It is up**: <https://reny-develop.github.io/Rulealize.Registry/>. Beside the pages it
+renders out of the catalogue it writes one that is not: the
+[submit page](https://reny-develop.github.io/Rulealize.Registry/submit/), whose checks are the
+registry's own restated for a browser — the same patterns, the same reserved list, the same
+line — and held to them by [`tool/Site/test/submit.mjs`](tool/Site/test/submit.mjs).
 
 Every page says in its footer when the catalogue was last read out of nuget.org, and
 `index.json` carries the same stamp to the second. An index nobody is keeping looks exactly

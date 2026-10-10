@@ -23,7 +23,7 @@ using System.Xml.Linq;
 // reason these are two documents. Operations, inputs, requires and uses are in neither the
 // ledger nor a submission — they are read out of what was published, here.
 //
-// It follows that a new version of anything already in the ledger needs no pull request at
+// It follows that a new version of anything already in the ledger needs no new submission at
 // all: nothing committed changes, and the catalogue picks it up the next time this runs.
 // What that would otherwise let through is a package quietly renaming itself between
 // versions, so this checks every version against the ledger. One that says something else is
@@ -235,7 +235,16 @@ if (violations.Count is not 0)
     return 1;
 }
 
-WriteCatalogue(catalogued, documented, outputFolder);
+// The names nothing may claim, beside the ledger they are refused from. A client checking a
+// submission before it is made needs them as much as it needs what is already claimed, and an
+// older checkout without the file publishes none rather than an empty list that would say
+// nothing is reserved.
+string reservedPath = Path.Combine(Path.GetDirectoryName(Path.GetFullPath(ledgerPath))!, "reserved.json");
+using JsonDocument? reserved = File.Exists(reservedPath)
+    ? JsonDocument.Parse(await File.ReadAllTextAsync(reservedPath))
+    : null;
+
+WriteCatalogue(catalogued, documented, reserved?.RootElement, outputFolder);
 Console.Error.WriteLine($"{catalogued.Count} plugins, {documented.Count} rule sets → {outputFolder}");
 return 0;
 
@@ -596,7 +605,7 @@ static IReadOnlyList<string> Offers(string id, Dictionary<string, Piece> pieces)
     }
 }
 
-static void WriteCatalogue(List<PluginEntry> plugins, List<RuleSetEntry> ruleSets, string folder)
+static void WriteCatalogue(List<PluginEntry> plugins, List<RuleSetEntry> ruleSets, JsonElement? reserved, string folder)
 {
     Dictionary<string, Piece> pieces = Pieces(ruleSets);
 
@@ -745,6 +754,28 @@ static void WriteCatalogue(List<PluginEntry> plugins, List<RuleSetEntry> ruleSet
         // this file is compared against nothing and published, and the one question a reader
         // cannot answer without it is whether they are looking at something still being kept.
         writer.WriteString("checked", DateTimeOffset.UtcNow.ToString("yyyy-MM-dd'T'HH:mm:ss'Z'"));
+
+        if (reserved is JsonElement refused)
+        {
+            writer.WritePropertyName("reserved");
+            writer.WriteStartObject();
+            foreach (string list in (string[])["namespaces", "prefixes"])
+            {
+                writer.WritePropertyName(list);
+                writer.WriteStartArray();
+                if (refused.TryGetProperty(list, out JsonElement names))
+                {
+                    foreach (JsonElement name in names.EnumerateArray())
+                    {
+                        writer.WriteStringValue(name.GetString());
+                    }
+                }
+
+                writer.WriteEndArray();
+            }
+
+            writer.WriteEndObject();
+        }
 
         writer.WritePropertyName("plugins");
         writer.WriteStartArray();

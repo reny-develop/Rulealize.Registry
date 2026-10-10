@@ -1,9 +1,9 @@
-# The admission gate's own cases.
+# The cases for the scripts a submission goes through.
 #
-# admit.yml runs with a token that can merge, from a script on main that nothing in a pull
-# request can reach. What a pull request can reach is this file and the cases themselves, so
-# they are run here as an ordinary check: a change that weakens a rule has to show up as a
-# case that no longer passes.
+# submit.yml runs them with a token that can write the ledger, from main, where nothing in a
+# submission can reach them. What a pull request can reach is the scripts and the cases
+# themselves, so they are run here as an ordinary check: a change that weakens a rule has to
+# show up as a case that no longer passes.
 
 name: gate
 
@@ -20,5 +20,8 @@ jobs:
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
 
-      - name: Run the cases
+      - name: Run the admission cases
         run: bash .github/admit/test/run.sh
+
+      - name: Run the submission cases
+        run: bash .github/submit/test/run.sh
