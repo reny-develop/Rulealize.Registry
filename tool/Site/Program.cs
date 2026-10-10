@@ -10,11 +10,10 @@ using System.Text.Json;
 //
 //   dotnet run --project tool/Site -- <catalogue folder> <output folder>
 //
-// The output holds the JSON as well as the HTML, because the static files are the API:
-// /index.json and /plugin/<id>.json are what the resolver and anything else reads, and the
-// pages are a second view of the same bytes rather than a separate build of the same facts.
-// The search on the front page fetches /index.json like any other client, which is the
-// cheapest way of finding out whether that file is usable.
+// The output holds the JSON as well as the HTML, and the pages are a second view of the same
+// bytes rather than a separate build of the same facts. The search on the front page fetches
+// /index.json, which is the cheapest way of finding out whether that file is usable. Where
+// the JSON is served is not promised to anybody outside this repository.
 //
 // There is one page per operation. It holds nothing the plugin's page does not, and it exists
 // because `grid.ray` is the thing somebody has in their hand when they arrive — a name out of
@@ -822,15 +821,10 @@ static async Task WriteFront(List<Plugin> plugins, List<RuleSet> ruleSets, strin
     }
 
     body.Append("""
-        <h2>The files behind this page</h2>
+        <h2>Where these pages come from</h2>
         <p>Nothing here is written by hand. Each entry is derived from the published package — a plugin
         by loading it and reading back what it registered, a rule set by reading the document it
-        distributes — and these are the same files the resolver reads:</p>
-        <ul>
-          <li><a href="index.json"><code>/index.json</code></a> — every plugin, operation and rule set, in summary</li>
-          <li><code>/plugin/&lt;id&gt;.json</code> — one plugin, every released version, every operation of each</li>
-          <li><code>/ruleset/&lt;id&gt;.json</code> — one rule set, every released version, what each holds and requires</li>
-        </ul>
+        distributes.</p>
         """);
 
     body.Append("""

@@ -77,9 +77,6 @@ dotnet run --project tool/Catalogue -- ledger/submitted.json work/probe/Rulealiz
 | `catalogue/plugin/<id>.json` | one plugin, every released version, every operation of each |
 | `catalogue/ruleset/<id>.json` | one rule set, every released version, what each holds and requires |
 
-The site publishes those three at the root, which is where anything reading them looks:
-`/index.json`, `/plugin/<id>.json`, `/ruleset/<id>.json`.
-
 The ledger holds one line per package because [a claim is permanent](doc/policy.md#a-claim-is-permanent);
 the catalogue holds one entry per version because `requires` and `uses` read `^1.0` and what a
 release offers may grow within a major. **So a new version of anything already admitted needs
@@ -153,17 +150,17 @@ a composite could constrain.
 dotnet run --project tool/Site -- catalogue site
 ```
 
-It reads `/index.json`, `/plugin/<id>.json` and `/ruleset/<id>.json` and nothing else — no
-reference to Rulealize, none to the catalogue's code — so it is the first consumer of the
-published API rather than a second path to the same facts. The search on the front page
-fetches `/index.json` like any other client would.
+It reads the catalogue's three kinds of file and nothing else — no reference to Rulealize,
+none to the catalogue's code — so the pages are a view of those files rather than a second
+path to the same facts. The search on the front page fetches `index.json` from beside the
+page.
 
 **It is up**: <https://reny-develop.github.io/Rulealize.Registry/>. It carries `noindex` and
 says pre-release in its header, because nothing has been submitted to it from outside the
 project yet.
 
 Every page says in its footer when the catalogue was last read out of nuget.org, and
-`/index.json` carries the same stamp to the second. An index nobody is keeping looks exactly
+`index.json` carries the same stamp to the second. An index nobody is keeping looks exactly
 like one that is — the daily run could stop and every page would go on being served, correct
 about a world that had moved. The date is what says otherwise. The same run leaves one line
 per check on the [`checks`](../../tree/checks) branch, which is the record that outlives the
