@@ -204,6 +204,12 @@ if ! command -v node >/dev/null; then
 else
     (cd "$root" && node tool/Site/test/search.mjs "$work/ruleset")
     report $? "the search finds what it is given"
+
+    # 9. The submit page. Its checks are the registry's own restated for a browser, so the
+    # cases hold them to gate.sh, insert.sh and the issue form rather than to themselves.
+    echo
+    (cd "$root" && node tool/Site/test/submit.mjs "$work/ruleset")
+    report $? "the submit page checks what the registry checks"
 fi
 
 echo
