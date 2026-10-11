@@ -169,11 +169,13 @@ Everything an operation is called begins with one: `grid.ray`, `acme.frozen`. **
 recorded when the package is published, with two limits.
 
 **Reserved.** Those a published plugin already holds, and a short list held against plugins
-that do not exist yet, in [`ledger/reserved.json`](../ledger/reserved.json) — `str`, `time`,
-`set`, `fmt` at the time of writing, and that file rather than this sentence is what CI
-refuses a claim against. A general name that a vocabulary not yet written would obviously
-want should not be spent by whoever asked first, because unlike an identifier there is no
-supply of others.
+that do not exist yet, in [`ledger/reserved.json`](../ledger/reserved.json) — `time`, `set`,
+`fmt` at the time of writing, and that file rather than this sentence is what CI refuses a
+claim against. A general name that a vocabulary not yet written would obviously want should not
+be spent by whoever asked first, because unlike an identifier there is no supply of others.
+A name is taken off that list when the official vocabulary it was held for is recorded, in the
+same change that records its claim, so that there is no moment at which it is free for anybody
+else; `str` came off it that way, with `Rulealize.Plugin.Text`.
 
 **Vendor-qualify a private vocabulary.** `acme`, not `deploy`. A namespace with an audience
 of one still occupies a name in a space everyone shares, which is why
