@@ -100,7 +100,7 @@ internal static partial class Program
         </div>
         <h2>What happens next</h2>
         <ol class="next">
-        <li><b>GitHub opens your submission, filled in</b>Press the green “Submit new issue” button. That is all — a
+        <li><b>GitHub opens your submission, filled in</b>Press the green “Create” button. That is all — a
         GitHub account is the only thing you need. No fork, no pull request, no file to edit.</li>
         <li><b>The registry reads your package</b>It reads the package the way an application would and compares
         what it says with this page, usually within a few minutes. GitHub notifies you of the result.</li>

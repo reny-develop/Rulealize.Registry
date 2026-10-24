@@ -15,13 +15,14 @@ body:
         Opened from the [registry's submit page](https://reny-develop.github.io/Rulealize.Registry/submit/). The result is posted here, and GitHub notifies you.
 
         Everything below is read again out of the package itself. A claim is permanent.
-  - type: dropdown
+  # An input, not a dropdown: GitHub fills inputs from the URL but leaves a dropdown unchosen,
+  # and a required one then refuses the issue. parse.sh accepts only the two values.
+  - type: input
     id: kind
     attributes:
       label: Kind
-      options:
-        - Plugin
-        - Rule set
+      description: Plugin, or Rule set.
+      placeholder: Plugin
     validations:
       required: true
   - type: input
