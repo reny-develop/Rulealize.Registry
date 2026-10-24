@@ -147,7 +147,9 @@ jobs:
               + "- namespace `\(.namespace)`, "
               + (if .prefix == null then "no shorthand character" else "shorthand character `\(.prefix)`" end)
               + ", manifest version \(.admitted) — as submitted\n"
-              + "- \($ops | length) operations: " + ($ops | map("`\(.)`") | join(", ")) + "\n\n"
+              + (if ($ops | length) == 0 then "- no operations"
+                 else "- \($ops | length) operation\(if ($ops | length) == 1 then "" else "s" end): " + ($ops | map("`\(.)`") | join(", ")) end)
+              + "\n\n"
               + "The site shows it once the catalogue has been rebuilt, usually within a few minutes. "
               + "Later releases need nothing from you — they are read every day."
             ' work/claim.json > work/answer.md
