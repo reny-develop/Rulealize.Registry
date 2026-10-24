@@ -14,6 +14,7 @@
     { "id": "Rulealize.Plugin.Record", "version": "1.0.0", "namespace": "rec", "prefix": null },
     { "id": "Rulealize.Plugin.Secret", "version": "1.0.0", "namespace": "secret", "prefix": null },
     { "id": "Rulealize.Plugin.Sequence", "version": "1.2.0", "namespace": "seq", "prefix": null },
+    { "id": "Rulealize.Plugin.SqliteStore", "version": "1.0.0", "namespace": "sqlite", "prefix": null },
     { "id": "Rulealize.Plugin.State", "version": "1.0.0", "namespace": "state", "prefix": "$" },
     { "id": "Rulealize.Plugin.Text", "version": "1.0.0", "namespace": "str", "prefix": null },
     { "id": "Rulealize.Plugin.Tuple", "version": "1.0.0", "namespace": "tuple", "prefix": null },
