@@ -5,6 +5,11 @@
   "prefix": null,
   "admitted": "1.0.0",
   "latest": "1.0.0",
+  "repository": "https://github.com/acme/Acme.Vocab",
+  "specification": "https://raw.githubusercontent.com/acme/Acme.Vocab/main/doc/specification.md",
+  "forms": {
+    "acme.each": "{\n  \"op\": \"acme.each\",\n  \"of\": <expression:Sequence>,\n  \"as\": \"<name>\"   // optional\n}"
+  },
   "versions": [
     { "version": "1.0.0", "operations": { "expression": ["acme.each", "acme.some"], "effect": [], "schema": [] } }
   ]

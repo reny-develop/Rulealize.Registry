@@ -72,6 +72,18 @@ report $? "escapes the checked timestamp"
 grep -rq --include='*.html' 'Last checked' "$work/url"
 report $? "says when the catalogue was checked"
 
+# llms.txt is plain text, so escaping is not what keeps a publisher's string in its place —
+# where it sits is. A description is set on one line after a label, and a form in a fence
+# longer than any run of backticks inside it, so neither can start a section of its own.
+! grep -q '^## From the description' "$work/url/llms.txt"
+report $? "keeps a description on the line it was put on in llms.txt"
+
+grep -q '^````jsonc' "$work/url/llms.txt"
+report $? "fences a form with more backticks than it holds"
+
+! grep -q 'javascript:' "$work/url/llms.txt"
+report $? "does not offer a javascript: URL as a specification"
+
 # 3. A catalogue from before there was a timestamp to say. Leaving the line off is the honest
 # answer; inventing one, or refusing to render, would both be worse.
 mkdir -p "$work/plain"
@@ -188,10 +200,38 @@ report $? "writes a uses example whose alias is short"
 [[ -f "$work/ruleset/ruleset/Acme.Rules.Roster.json" ]]
 report $? "publishes the entry beside the page"
 
+# llms.txt, which is the same index for something writing a rule set: every operation with the
+# keys it takes, and the line that names its plugin. A form the specification was not found to
+# state is said to be missing, with where to read it — never made up.
+llms="$work/ruleset/llms.txt"
+
+grep -q '"of": <expression:Sequence>,' "$llms"
+report $? "writes an operation's form into llms.txt"
+
+grep -A2 '^#### acme.some — expression' "$llms"     | grep -q 'Form: not found here — read it in the specification: https://raw.githubusercontent.com/acme/Acme.Vocab/main/doc/specification.md'
+report $? "says where to read a form it does not have"
+
+grep -qF 'requires: { "plugin": "Acme.Vocab", "version": "^1.0" }' "$llms"
+report $? "gives the requires line for a plugin"
+
+grep -qF 'uses: { "ruleSet": "Acme.Rules.Roster", "version": "^1.0", "as": "roster" }' "$llms"
+report $? "gives the uses line for a rule set"
+
+grep -q '`roster.assign`' "$llms"
+report $? "names a rule set's inputs as a holder writes them"
+
+grep -q 'of&quot;: &lt;expression:Sequence&gt;' "$work/ruleset/op/acme.each.html"
+report $? "shows the form on the operation's page"
+
 # 7. A catalogue from before rule sets were indexed. Every fixture above this one has no
 # `ruleSets` at all, and the front page has to say so rather than render an empty table.
 grep -q 'None yet' "$work/plain/index.html"
 report $? "says none rather than an empty table of rule sets"
+
+# A catalogue from before forms were read. Every operation is still listed, each pointing at
+# the specification under the repository the entry names.
+grep -q 'Form: not found here — read it in the specification: https://example.invalid/plain/blob/main/doc/specification.md' "$work/plain/llms.txt"
+report $? "points at the specification when the catalogue carries no forms"
 
 echo
 

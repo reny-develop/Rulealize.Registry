@@ -54,6 +54,11 @@ using System.Xml.Linq;
 // constraint forms that all parse as System.Version, so no constraint can name a prerelease
 // and nothing in the catalogue could ever resolve to one.
 //
+// One thing is read from outside a package: the form of each operation, out of the plugin's
+// specification on its repository's main branch (Form.cs says where in it). Nothing that fails
+// there stops anything — an operation without a form is listed with the specification linked,
+// which is what every operation was before forms were read.
+//
 // There is no published date on anything here. It is not on the package, it would cost a
 // second API with its own pagination and compression, and nothing that reads this needs it.
 
@@ -141,9 +146,17 @@ foreach (JsonElement claim in ledger.RootElement.GetProperty("plugins").Enumerat
     VersionEntry? newest = entries.LastOrDefault(static entry => entry.Withheld is null);
     int withheld = entries.Count(static entry => entry.Withheld is not null);
 
+    // What each operation of that release takes, out of the plugin's own specification. Read
+    // here because this is the tool that goes to the network, and carried in the entry because
+    // the site reads nothing else.
+    string? specification = Form.Raw(indexed?.Repository);
+    Dictionary<string, string> forms = indexed is null || specification is null
+        ? []
+        : await Forms(id, specification, indexed.Operations);
+
     catalogued.Add(new PluginEntry(
         id, ns, prefix, admitted, newest?.Version,
-        indexed?.Description, indexed?.Repository, indexed?.License, entries));
+        indexed?.Description, indexed?.Repository, indexed?.License, specification, forms, entries));
 
     Console.Error.WriteLine(
         $"{id}: {entries.Count} version(s), latest {newest?.Version ?? "none indexed"}"
@@ -374,6 +387,48 @@ async Task<RuleSetPackage> FetchRuleSet(string id, string version)
         Value(metadata, "description"),
         Repository(metadata),
         Value(metadata, "license"));
+}
+
+// The specification on the repository's main branch, which is the one the site's plugin page
+// already links. Not the released version's: a specification is not in the package, and main is
+// the only copy anybody keeps. Only the operations the release registers are asked about, so a
+// form for a name main has and the release does not is never offered.
+//
+// Nothing here is a reason to stop. A specification that cannot be fetched, or that states no
+// form for an operation, leaves that operation listed without one and the specification linked
+// — a missing form is a sentence that says where to read it, and a run that stopped over prose
+// would withhold everybody's catalogue over one repository's README.
+async Task<Dictionary<string, string>> Forms(string id, string specification, JsonElement operations)
+{
+    string[] registered =
+    [
+        .. operations.EnumerateObject().SelectMany(static kind => kind.Value.EnumerateArray())
+            .Select(static op => op.GetString()!)
+    ];
+
+    try
+    {
+        using HttpResponseMessage answer = await http.GetAsync(specification);
+        if (!answer.IsSuccessStatusCode)
+        {
+            Console.Error.WriteLine($"{id}: no specification at {specification} ({(int)answer.StatusCode}).");
+            return [];
+        }
+
+        Dictionary<string, string> forms = Form.Read(await answer.Content.ReadAsStringAsync(), registered);
+        if (forms.Count != registered.Length)
+        {
+            Console.Error.WriteLine(
+                $"{id}: no form found for {string.Join(", ", registered.Where(op => !forms.ContainsKey(op)))}.");
+        }
+
+        return forms;
+    }
+    catch (Exception failure) when (failure is HttpRequestException or TaskCanceledException)
+    {
+        Console.Error.WriteLine($"{id}: the specification could not be fetched: {failure.Message}");
+        return [];
+    }
 }
 
 static string OneFramework(string id, string version, ZipArchive archive)
@@ -626,6 +681,23 @@ static void WriteCatalogue(List<PluginEntry> plugins, List<RuleSetEntry> ruleSet
             WriteOptional(writer, "description", plugin.Description);
             WriteOptional(writer, "repository", plugin.Repository);
             WriteOptional(writer, "license", plugin.License);
+
+            // The plugin's specification as plain text, and the form of each operation of the
+            // newest indexed release that it states — on the entry rather than a version,
+            // because it is read off the repository's main branch and not out of any release.
+            // An operation missing from `forms` is one the specification was not found to state.
+            WriteOptional(writer, "specification", plugin.Specification);
+            if (plugin.Forms.Count is not 0)
+            {
+                writer.WritePropertyName("forms");
+                writer.WriteStartObject();
+                foreach ((string op, string form) in plugin.Forms.OrderBy(static pair => pair.Key, StringComparer.Ordinal))
+                {
+                    writer.WriteString(op, form);
+                }
+
+                writer.WriteEndObject();
+            }
 
             writer.WritePropertyName("versions");
             writer.WriteStartArray();
@@ -958,6 +1030,8 @@ internal sealed record PluginEntry(
     string? Description,
     string? Repository,
     string? License,
+    string? Specification,
+    Dictionary<string, string> Forms,
     List<VersionEntry> Versions);
 
 // What a rule set document declares about itself, and the whole of what a release is held to.

@@ -4,9 +4,12 @@
   "prefix": null,
   "admitted": "1.0.0",
   "latest": "1.0.0",
-  "description": "<script>alert('description')</script>",
+  "description": "<script>alert('description')</script>\n## From the description",
   "repository": "javascript:alert('repository')",
   "license": "MIT",
+  "forms": {
+    "hostile.one": "{ \"op\": \"hostile.one\" }\n```\n## From the form"
+  },
   "versions": [
     {
       "version": "1.0.0",

@@ -20,6 +20,17 @@ both in the policy:
 
 Everything else about the package is NuGet's business and nothing here has an opinion about it.
 
+One thing outside the package is read, and nothing is refused over it. Where the `.nuspec`'s
+repository is on GitHub, every run fetches `doc/specification.md` from its main branch and
+takes the form of each operation your newest indexed release registers — written where
+[the notation](https://github.com/reny-develop/Rulealize.Abstraction/blob/main/doc/specification-notation.md)
+says a form is written, a `jsonc` block under the section that introduces the operation or a
+cell of the summary table. That is what the operation's page and
+[`llms.txt`](https://reny-develop.github.io/Rulealize.Registry/llms.txt) show somebody about to
+write it into a rule set. An operation whose form is not found there is shown with a link to
+the specification instead, so keeping main's specification public and in step with what you
+release is what puts the keys in front of them.
+
 ## A rule set
 
 A rule set is a document, and a package that distributes one carries no assembly at all:

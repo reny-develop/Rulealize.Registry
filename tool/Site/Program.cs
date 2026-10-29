@@ -15,10 +15,14 @@ using System.Text.Json;
 // /index.json, which is the cheapest way of finding out whether that file is usable. Where
 // the JSON is served is not promised to anybody outside this repository.
 //
-// There is one page per operation. It holds nothing the plugin's page does not, and it exists
-// because `grid.ray` is the thing somebody has in their hand when they arrive — a name out of
+// There is one page per operation. It holds nothing the plugin's page does not but the
+// operation's form, and it exists because `grid.ray` is the thing somebody has in their hand when they arrive — a name out of
 // a rule set, or out of an error message, with no way to know which vocabulary it belongs to.
 // Answering that is the one question nuget.org structurally cannot.
+//
+// Beside the pages it writes llms.txt, the same index as one plain-text page for something
+// writing a rule set: every operation with its kind and its form, and the line that requires
+// each plugin or holds each rule set. See Llms.cs.
 //
 // Every string that came from a package description is escaped on the way in. It is written
 // by whoever published the plugin, and the catalogue keeps it escaped in JSON for the same
@@ -100,7 +104,18 @@ foreach (JsonElement summary in index.RootElement.GetProperty("plugins").Enumera
         Text(root, "description"),
         Text(root, "repository"),
         Text(root, "license"),
-        releases));
+        releases)
+    {
+        // What each operation takes, as the plugin's own specification writes it. An older
+        // catalogue carries neither, and an operation missing from `forms` is one nobody found
+        // a form for — both are answered with the specification's address rather than a guess.
+        Specification = Text(root, "specification"),
+        Forms = root.TryGetProperty("forms", out JsonElement forms) && forms.ValueKind is JsonValueKind.Object
+            ? forms.EnumerateObject()
+                .Where(static form => form.Value.ValueKind is JsonValueKind.String)
+                .ToDictionary(static form => form.Name, static form => form.Value.GetString()!, StringComparer.Ordinal)
+            : []
+    });
 
     File.Copy(path, Path.Combine(output, "plugin", $"{id}.json"), overwrite: true);
 }
@@ -252,6 +267,9 @@ foreach (Plugin plugin in plugins)
         }
     }
 }
+
+// The same index for something that reads rather than browses. See Llms.cs.
+await File.WriteAllTextAsync(Path.Combine(output, "llms.txt"), Llms.Render(plugins, ruleSets, CheckedAt is null ? null : Stamp(CheckedAt)), new UTF8Encoding(false));
 
 Console.Error.WriteLine($"{plugins.Count} plugins, {written} operations, {ruleSets.Count} rule sets -> {output}");
 return 0;
@@ -881,17 +899,6 @@ static string WithheldDocument(RuleSet ruleSet, RuleSetRelease release, string r
         + "and a claim is permanent, so it is not in the index.";
 }
 
-// What a `uses` example writes. The latest indexed release's major, because that is what a
-// document holding this today would pin, and 1 where nothing is indexed to read one off.
-static string Major(string? latest) =>
-    Version.TryParse(latest, out Version? parsed) ? $"{parsed.Major}.{Math.Max(parsed.Minor, 0)}" : "1.0";
-
-// The short name a holder would reach for. `as` may not contain a dot, so a package-shaped
-// identifier cannot be its own alias — which is the whole reason `as` is not optional in
-// practice, and why the identifier being long costs a document one word.
-static string Alias(string id) =>
-    id.Split('.').LastOrDefault(static part => part.Length is not 0)?.ToLowerInvariant() ?? id;
-
 // The releases of a plugin that register an operation, as a range when they are a run.
 static string[] Carrying(string op, string kind, Plugin plugin) =>
 [
@@ -912,6 +919,16 @@ static string OperationBody(string op, string kind, Plugin plugin)
     body.Append($"<a href=\"../plugin/{H(plugin.Id)}.html\">{H(plugin.Id)}</a>.</p>");
 
     body.Append("<div class=\"cols\"><div class=\"main\">");
+
+    // The keys it takes, as the specification writes them. It is the one line of that document
+    // somebody holding the name needs before anything else, and the page says where it came from.
+    if (plugin.Forms.TryGetValue(op, out string? form))
+    {
+        body.Append("<h2>Form</h2>");
+        body.Append($"<pre class=\"dark\"><code>{H(form)}</code></pre>");
+        body.Append("<p class=\"meta\">As the specification on the plugin's main branch writes it, read again on every run.</p>");
+    }
+
     body.Append(
         "<p>What it does is in that plugin's specification, which ships with the plugin and "
         + "changes when it releases");
@@ -1358,6 +1375,12 @@ internal sealed record Plugin(
 {
     /// <summary>The newest release the catalogue indexed, if it indexed any.</summary>
     internal Release? Indexed => Releases.LastOrDefault(static release => release.Withheld is null);
+
+    /// <summary>The specification as plain text, where the catalogue knows one.</summary>
+    internal string? Specification { get; init; }
+
+    /// <summary>The form of each operation of <see cref="Indexed"/> the specification was found to state.</summary>
+    internal Dictionary<string, string> Forms { get; init; } = [];
 }
 
 /// <summary>One entry of a rule set's <c>requires</c>: a vocabulary, and which versions will do.</summary>
@@ -1402,6 +1425,18 @@ internal static partial class Program
 
     /// <summary>The shorthand characters nothing may claim, as the catalogue publishes them.</summary>
     internal static List<string> ReservedPrefixes { get; set; } = [];
+
+    // What a `uses` or a `requires` example writes. The latest indexed release's major and
+    // minor, because that is what a document holding this today would pin, and 1.0 where
+    // nothing is indexed to read one off.
+    internal static string Major(string? latest) =>
+        Version.TryParse(latest, out Version? parsed) ? $"{parsed.Major}.{Math.Max(parsed.Minor, 0)}" : "1.0";
+
+    // The short name a holder would reach for. `as` may not contain a dot, so a package-shaped
+    // identifier cannot be its own alias — which is the whole reason `as` is not optional in
+    // practice, and why the identifier being long costs a document one word.
+    internal static string Alias(string id) =>
+        id.Split('.').LastOrDefault(static part => part.Length is not 0)?.ToLowerInvariant() ?? id;
 
     // One stylesheet, no framework, no build step, and no font fetched from anywhere: the faces
     // are named and fall back to the system's own. Both themes are defined because a reader

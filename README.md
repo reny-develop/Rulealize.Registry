@@ -78,7 +78,7 @@ dotnet run --project tool/Catalogue -- ledger/submitted.json work/probe/Rulealiz
 | | |
 | --- | --- |
 | `catalogue/index.json` | every plugin, operation and rule set in summary, with the names the site searches — 13 KB at the size it is today, which is what makes search a client-side matter |
-| `catalogue/plugin/<id>.json` | one plugin, every released version, every operation of each |
+| `catalogue/plugin/<id>.json` | one plugin, every released version, every operation of each — and the form of each operation of the newest indexed one, as the plugin's specification writes it |
 | `catalogue/ruleset/<id>.json` | one rule set, every released version, what each holds and requires |
 
 The ledger holds one line per package because [a claim is permanent](doc/policy.md#a-claim-is-permanent);
@@ -96,7 +96,8 @@ put it right is the one it is said to.
 
 Nothing hand-written goes into a catalogue entry. The description, repository and licence are
 in the `.nuspec`; a plugin's claims, operations and abstraction version are in the assembly,
-and a rule set's identifier, version, `requires`, `uses` and inputs are in the document. A
+an operation's form is in the plugin's specification, and a rule set's identifier, version,
+`requires`, `uses` and inputs are in the document. A
 submission is a package identifier, the version to read it at, and — for a plugin — the two
 names it claims. Every one of those is checked against the package before it counts.
 
@@ -106,6 +107,17 @@ otherwise meets as a `ReflectionTypeLoadException`, which the runtime can only r
 rather than copied, for the reason a specification lives with its own plugin: it describes
 one version of one vocabulary and has to change when that plugin releases, so a copy here
 would ship on this repository's schedule and would eventually be wrong.
+
+**The one thing taken out of a specification is an operation's form** — the JSON that names
+the node, with what may stand in each key — because that is the line somebody writing a rule
+set cannot do without, and a name written without it is a guess. It is not a copy anybody
+keeps: every run fetches `doc/specification.md` from the main branch of the repository the
+`.nuspec` names, as plain text, and reads a form out of it where
+[the notation](https://github.com/reny-develop/Rulealize.Abstraction/blob/main/doc/specification-notation.md)
+says one is written — a `jsonc` block under the section that introduces the operation, or a
+cell of the summary table. Only the operations the assembly registers are looked for. One the
+specification is not found to state is left without a form, and the specification is linked
+instead; a specification that cannot be fetched costs its forms and nothing else.
 
 ## Why this is not just a page on nuget.org
 
@@ -145,7 +157,7 @@ What is left for an index to do is smaller and it is not nothing:
 ## The site
 
 [`tool/Site`](tool/Site/) renders the catalogue as pages: the claim table, a plugin page per
-entry, a page per operation — because `grid.ray` is what somebody arrives holding and knowing
+entry, a page per operation with its form — because `grid.ray` is what somebody arrives holding and knowing
 which vocabulary owns it is the question nuget.org structurally cannot answer — and a rule set
 page per entry, which says what that document holds, what it draws on, and which of its inputs
 a composite could constrain.
@@ -164,6 +176,15 @@ renders out of the catalogue it writes one that is not: the
 [submit page](https://reny-develop.github.io/Rulealize.Registry/submit/), whose checks are the
 registry's own restated for a browser — the same patterns, the same reserved list, the same
 line — and held to them by [`tool/Site/test/submit.mjs`](tool/Site/test/submit.mjs).
+
+**It also writes [`llms.txt`](https://reny-develop.github.io/Rulealize.Registry/llms.txt)**: the
+same index as one plain-text page, for something that reads rather than browses. Every
+operation of every plugin's newest indexed release with its kind and its form, the `requires`
+line for each plugin, the `uses` line and the inputs of each published rule set, and how to
+read a form. A rule set is written out of exact names, and an operation page answers one name
+at a time, a link away from the specification that says which keys it takes; this is all of
+them, on the page somebody would open first. It is rendered from the catalogue like
+everything else, so it grows with every registration and nobody keeps it.
 
 Every page says in its footer when the catalogue was last read out of nuget.org, and
 `index.json` carries the same stamp to the second. An index nobody is keeping looks exactly
