@@ -27,6 +27,7 @@
     { "id": "Rulealize.RuleSet.PackingList", "version": "1.0.0" },
     { "id": "Rulealize.RuleSet.Quota", "version": "1.0.0" },
     { "id": "Rulealize.RuleSet.Request", "version": "1.0.0" },
+    { "id": "Rulealize.RuleSet.Reversi", "version": "1.0.0" },
     { "id": "Rulealize.RuleSet.Scoreboard", "version": "1.0.0" },
     { "id": "Rulealize.RuleSet.Signatures", "version": "1.0.0" },
     { "id": "Rulealize.RuleSet.SignedRequest", "version": "1.0.0" },
