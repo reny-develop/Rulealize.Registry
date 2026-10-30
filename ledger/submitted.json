@@ -22,6 +22,7 @@
   ],
   "ruleSets": [
     { "id": "Rulealize.RuleSet.Checklist", "version": "1.0.0" },
+    { "id": "Rulealize.RuleSet.Chess", "version": "1.0.0" },
     { "id": "Rulealize.RuleSet.Exchange", "version": "1.0.0" },
     { "id": "Rulealize.RuleSet.Minesweeper", "version": "1.0.0" },
     { "id": "Rulealize.RuleSet.PackingList", "version": "1.0.0" },
