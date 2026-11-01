@@ -32,6 +32,7 @@
     { "id": "Rulealize.RuleSet.Scoreboard", "version": "1.0.0" },
     { "id": "Rulealize.RuleSet.Signatures", "version": "1.0.0" },
     { "id": "Rulealize.RuleSet.SignedRequest", "version": "1.0.0" },
-    { "id": "Rulealize.RuleSet.SplitBill", "version": "1.0.0" }
+    { "id": "Rulealize.RuleSet.SplitBill", "version": "1.0.0" },
+    { "id": "Rulealize.RuleSet.WeightLog", "version": "1.0.0" }
   ]
 }
