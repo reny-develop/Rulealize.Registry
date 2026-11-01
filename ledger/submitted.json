@@ -21,6 +21,7 @@
     { "id": "Rulealize.Plugin.TypeSchema", "version": "1.1.0", "namespace": "type", "prefix": null }
   ],
   "ruleSets": [
+    { "id": "Rulealize.RuleSet.Calculator", "version": "1.0.0" },
     { "id": "Rulealize.RuleSet.Checklist", "version": "1.0.0" },
     { "id": "Rulealize.RuleSet.Chess", "version": "1.0.0" },
     { "id": "Rulealize.RuleSet.Exchange", "version": "1.0.0" },
